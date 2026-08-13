@@ -1,0 +1,34 @@
+flowchart LR
+  q[Historical queries]
+  selected[Previously selected results]
+  variants[Generated variations<br/>OCR errors, typos, partial names]
+  old[PostgreSQL pg_trgm]
+  new[Elasticsearch BM25 + analyzers]
+  metrics[MRR and mismatch analysis]
+  expert[Expert side-by-side review]
+  decision{Quality acceptable?}
+  rollout[Production rollout]
+  tune[Tune analyzers and boosts]
+
+  q --> old
+  q --> new
+  selected --> metrics
+  variants --> old
+  variants --> new
+  old --> metrics
+  new --> metrics
+  metrics --> expert
+  expert --> decision
+  decision -->|yes| rollout
+  decision -->|no| tune
+  tune --> new
+
+  classDef input fill:#EAF2F8,stroke:#1F4E79,color:#1B2631
+  classDef system fill:#E8F4F2,stroke:#2A7F78,color:#1B2631
+  classDef decision fill:#FDEBD0,stroke:#C56B2C,color:#1B2631
+  classDef done fill:#E9F7EF,stroke:#1E8449,color:#1B2631
+
+  class q,selected,variants input
+  class old,new,metrics,expert,tune system
+  class decision decision
+  class rollout done

@@ -1,0 +1,23 @@
+flowchart LR
+  user[User name query]
+  api[Search API]
+  pg[(PostgreSQL<br/>25M records)]
+  trgm[pg_trgm<br/>GIN / GiST index]
+  cpu[Database CPU saturation]
+  slow[~15s tail latency]
+
+  user --> api
+  api --> pg
+  pg --> trgm
+  trgm --> slow
+  trgm --> cpu
+
+  cpu -. a few concurrent requests .-> slow
+
+  classDef client fill:#EAF2F8,stroke:#1F4E79,color:#1B2631
+  classDef db fill:#FDEBD0,stroke:#C56B2C,color:#1B2631
+  classDef risk fill:#FADBD8,stroke:#922B21,color:#1B2631
+
+  class user,api client
+  class pg,trgm db
+  class cpu,slow risk

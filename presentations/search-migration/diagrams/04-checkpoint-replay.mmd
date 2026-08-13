@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  participant I as Indexer worker
+  participant ES as Elasticsearch
+  participant BQ as BigQuery
+
+  I->>ES: Read checkpoint
+  ES-->>I: timestamp + LSN + document ID
+  I->>BQ: Query newer rows behind safety lag
+  BQ-->>I: Ordered change batch
+  loop deterministic order
+    I->>ES: UPSERT or DELETE using PostgreSQL row ID
+  end
+  I->>ES: Persist checkpoint after successful batch
+
+  Note over I,ES: Crash recovery replays from the last checkpoint.
+  Note over ES: Same document ID makes replay idempotent.

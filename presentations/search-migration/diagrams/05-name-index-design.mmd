@@ -1,0 +1,30 @@
+flowchart TB
+  name((name field))
+
+  standard[Standard text<br/>BM25 ranking<br/>full-text behavior]
+  keyword[Normalized keyword<br/>exact boost<br/>case + accent normalization]
+  prefix[Prefix<br/>partial input<br/>autocomplete-like behavior]
+  ngram[Character n-gram<br/>trigram-like fragments<br/>typo tolerance]
+  shingle[Word shingle<br/>multi-word names<br/>phrase context]
+
+  name --> standard
+  name --> keyword
+  name --> prefix
+  name --> ngram
+  name --> shingle
+
+  query[Query time<br/>combine + weight signals]
+
+  standard --> query
+  keyword --> query
+  prefix --> query
+  ngram --> query
+  shingle --> query
+
+  classDef root fill:#1F4E79,stroke:#173B5C,color:#FFFFFF
+  classDef field fill:#EAF2F8,stroke:#1F4E79,color:#1B2631
+  classDef query fill:#FDEBD0,stroke:#C56B2C,color:#1B2631
+
+  class name root
+  class standard,keyword,prefix,ngram,shingle field
+  class query query
