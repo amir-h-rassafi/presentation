@@ -1,0 +1,363 @@
+\documentclass[aspectratio=169]{beamer}
+
+\input{../../common/preamble}
+
+\title{Running Search}
+\subtitle{From PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25}
+\author{Amir Hossein Rassafi}
+\institute{amir-h-rassafi.github.io}
+\date{May 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{The Story}
+  \tableofcontents
+\end{frame}
+
+\section{Problem}
+
+\begin{frame}{The Starting Point}
+  \begin{itemize}
+    \item Name search over almost 25M records.
+    \item PostgreSQL with \texttt{pg\_trgm} handled fuzzy matching.
+    \item Some queries took around 15 seconds.
+    \item A few concurrent requests could saturate database CPU.
+  \end{itemize}
+
+  \vspace{0.5cm}
+  \begin{block}{Goal}
+    Bring search latency under 1 second without breaking ranking behavior users already trusted.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Why Not Just Scale PostgreSQL?}
+  \begin{itemize}
+    \item The database already had 16 CPU cores and 64 GB memory.
+    \item More CPU helped concurrency more than single-query latency.
+    \item Four requests could still consume all CPU.
+    \item Search load was competing with the source-of-truth database.
+  \end{itemize}
+\end{frame}
+
+\section{Search Concepts}
+
+\begin{frame}{What \texttt{pg\_trgm} Does}
+  \begin{itemize}
+    \item It compares text by slicing strings into 3-character fragments.
+    \item Similar strings share many trigrams.
+    \item This makes it naturally good for typos, spacing differences, and fuzzy names.
+  \end{itemize}
+
+  \vspace{0.35cm}
+  \begin{exampleblock}{Example}
+    \texttt{search} $\rightarrow$ \texttt{\{ s, se, sea, ear, arc, rch, ch \}}\\
+    \texttt{serch} $\rightarrow$ \texttt{\{ s, se, ser, erc, rch, ch \}}
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Similarity Intuition}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \begin{block}{Shared fragments}
+        \centering
+        \Large 4
+      \end{block}
+
+    \column{0.48\textwidth}
+      \begin{block}{Unique fragments}
+        \centering
+        \Large 9
+      \end{block}
+  \end{columns}
+
+  \vspace{0.6cm}
+  \begin{center}
+    \Large
+    similarity = shared trigrams / total unique trigrams\\[0.2cm]
+    similarity = 4 / 9 = 0.44
+  \end{center}
+\end{frame}
+
+\begin{frame}{What BM25 Does}
+  \begin{itemize}
+    \item BM25 ranks documents by search relevance.
+    \item Rare query terms carry more weight.
+    \item Repeated terms help, but with diminishing returns.
+    \item Short, focused documents are rewarded compared with noisy ones.
+  \end{itemize}
+
+  \vspace{0.45cm}
+  \begin{block}{Key distinction}
+    \texttt{pg\_trgm} is text similarity. BM25 is relevance scoring over indexed terms.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Tokenization Changes Everything}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \begin{block}{Keyword tokenizer}
+        \texttt{apple apple banana}\\[0.2cm]
+        $\rightarrow$ one token
+      \end{block}
+
+    \column{0.48\textwidth}
+      \begin{block}{Word tokenizer}
+        \texttt{apple apple banana}\\[0.2cm]
+        $\rightarrow$ \texttt{apple}, \texttt{apple}, \texttt{banana}
+      \end{block}
+  \end{columns}
+
+  \vspace{0.45cm}
+  \begin{center}
+    The analyzer creates the terms. The terms drive BM25 scores.
+  \end{center}
+\end{frame}
+
+\section{Migration Design}
+
+\begin{frame}{Migration Requirements}
+  \begin{itemize}
+    \item Deploy Elasticsearch quickly with low operational overhead.
+    \item Replicate required PostgreSQL data into Elasticsearch.
+    \item Preserve fuzzy, language-agnostic name search behavior.
+    \item Benchmark old and new ranking behavior.
+    \item Prove the new path before production rollout.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Chosen Data Path}
+  \begin{center}
+    \begin{tabular}{c}
+      PostgreSQL source of truth \\
+      $\downarrow$ \\
+      GCP Datastream / change capture \\
+      $\downarrow$ \\
+      Append-only BigQuery replica \\
+      $\downarrow$ \\
+      Parallel indexer workers \\
+      $\downarrow$ \\
+      Elasticsearch search index
+    \end{tabular}
+  \end{center}
+
+  \vspace{0.45cm}
+  \begin{block}{Why BigQuery in the middle?}
+    It gave an inspectable, time-partitioned change history for debugging consistency problems.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Document Identity}
+  \begin{itemize}
+    \item Elasticsearch document ID reused the PostgreSQL row ID.
+    \item Engineers could debug the same entity across systems.
+    \item Retries became idempotent updates, not duplicate documents.
+    \item Replay became a normal recovery path.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Indexer Shape}
+  \begin{itemize}
+    \item Indexer ran as a set of parallel workers.
+    \item Records were routed by a deterministic sharding key.
+    \item Each worker owned one shard or a stable group of shards.
+    \item Every record had a predictable path through the pipeline.
+  \end{itemize}
+
+  \vspace{0.4cm}
+  \begin{block}{Result}
+    Less coordination, fewer duplicate-processing cases, and easier investigation.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Do Not Chase The Latest Timestamp}
+  \begin{itemize}
+    \item BigQuery visibility can lag behind source database changes.
+    \item Large transactions and CDC apply behavior can reorder what is visible.
+    \item The indexer intentionally read from a small window in the past.
+    \item In this case, around 15 minutes of search freshness lag was acceptable.
+  \end{itemize}
+
+  \vspace{0.4cm}
+  \begin{alertblock}{Important}
+    A delay buffer reduces risk, but correctness still needs metadata, sequence ordering, and checkpoints.
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{Checkpointing}
+  \begin{center}
+    \begin{tabular}{ll}
+      1 & Read latest checkpoint from Elasticsearch \\
+      2 & Query BigQuery for newer ordered records \\
+      3 & Order by timestamp, stream sequence, and document ID \\
+      4 & Write Elasticsearch UPSERT or DELETE operations \\
+      5 & Update checkpoint only after the batch succeeds
+    \end{tabular}
+  \end{center}
+
+  \vspace{0.5cm}
+  \begin{block}{Recovery model}
+    Reprocessing a small range is safer than checkpointing too aggressively and skipping changes.
+  \end{block}
+\end{frame}
+
+\section{Index Design}
+
+\begin{frame}{One Name, Multiple Views}
+  \begin{center}
+    \begin{tabular}{ll}
+      \toprule
+      Field view & Purpose \\
+      \midrule
+      Standard text & Normal full-text search \\
+      Normalized keyword & Exact and near-exact boost \\
+      Prefix & Beginning-of-name matching \\
+      Character n-gram & Trigram-like typo tolerance \\
+      Word shingle & Multi-word name combinations \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Prefix Matching}
+  \begin{exampleblock}{Input}
+    \texttt{progema}
+  \end{exampleblock}
+
+  \vspace{0.25cm}
+  \begin{center}
+    \texttt{pro}, \texttt{prog}, \texttt{proge}, \texttt{progem}, \texttt{progema}
+  \end{center}
+
+  \vspace{0.45cm}
+  \begin{block}{Use case}
+    Users often type only the beginning of a name and expect autocomplete-like behavior.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Character N-Grams}
+  \begin{exampleblock}{Input}
+    \texttt{progema}
+  \end{exampleblock}
+
+  \vspace{0.25cm}
+  \begin{center}
+    \texttt{pro}, \texttt{rog}, \texttt{oge}, \texttt{gem}, \texttt{ema}
+  \end{center}
+
+  \vspace{0.45cm}
+  \begin{block}{Use case}
+    This was the closest Elasticsearch signal to the old \texttt{pg\_trgm} behavior.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Word Shingles}
+  \begin{exampleblock}{Input}
+    \texttt{progema fastighets ab}
+  \end{exampleblock}
+
+  \vspace{0.25cm}
+  \begin{center}
+    \texttt{progema}\\
+    \texttt{fastighets}\\
+    \texttt{ab}\\
+    \texttt{progema fastighets}\\
+    \texttt{fastighets ab}\\
+    \texttt{progema fastighets ab}
+  \end{center}
+
+  \vspace{0.35cm}
+  \begin{block}{Use case}
+    Better ranking for longer company names and multi-token queries.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Query Strategy}
+  \begin{itemize}
+    \item Combine several name signals at query time.
+    \item Boost exact and normalized matches.
+    \item Use prefix fields for partial input.
+    \item Use n-gram fields for misspellings and fuzzy fragments.
+    \item Use shingles to preserve multi-word context.
+  \end{itemize}
+
+  \vspace{0.45cm}
+  \begin{block}{Outcome}
+    Around 90\% similar ranking experience with latency up to about 100 ms.
+  \end{block}
+\end{frame}
+
+\section{Validation}
+
+\begin{frame}{Benchmarking Layer 1: Backtesting}
+  \begin{itemize}
+    \item Use historical user queries.
+    \item Compare against results users actually selected.
+    \item Measure whether Elasticsearch returned the same expected result.
+    \item Track ranking differences with metrics such as MRR.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Benchmarking Layer 2: Generated Cases}
+  \begin{itemize}
+    \item Generate OCR-like errors.
+    \item Add human typos and missing characters.
+    \item Change spacing and casing.
+    \item Remove words or groups of words.
+    \item Test clean names and messy real-world inputs.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Benchmarking Layer 3: Human Judgement}
+  \begin{itemize}
+    \item Run the same query against both systems.
+    \item Ask domain experts which result looked better.
+    \item Use expert preference to validate ranking quality.
+  \end{itemize}
+
+  \vspace{0.45cm}
+  \begin{block}{Interesting result}
+    Automated metrics showed ranking mismatch, but experts preferred the new results often enough to go live.
+  \end{block}
+\end{frame}
+
+\section{Outcome}
+
+\begin{frame}{Before And After}
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      Dimension & Before & After \\
+      \midrule
+      Search engine & PostgreSQL \texttt{pg\_trgm} & Elasticsearch \\
+      Dataset size & 25M records & 25M replicated records \\
+      Worst query latency & About 15s & Up to about 100ms \\
+      Fuzzy behavior & Native trigram & Multi-field analyzers \\
+      Data freshness & Immediate DB read & About 15 min lag \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Lessons}
+  \begin{itemize}
+    \item Search migration is not only a database replacement.
+    \item The replication path needs observability and replayability.
+    \item Analyzer design matters as much as the search engine.
+    \item Ranking metrics are useful, but human judgement can change the decision.
+    \item Idempotent writes and checkpoints reduce operational risk.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Closing}
+  \begin{center}
+    \Large
+    Elasticsearch did not replace \texttt{pg\_trgm} directly.\\[0.35cm]
+    It recreated the useful signals through analyzers, weighting, benchmarks, and a replayable indexing pipeline.
+  \end{center}
+\end{frame}
+
+\end{document}
