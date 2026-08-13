@@ -1,4 +1,6 @@
-\usetheme{default}
+\usetheme{Madrid}
+\usecolortheme{dolphin}
+\usefonttheme{professionalfonts}
 
 \usepackage[T1]{fontenc}
 \usepackage[scaled=0.96]{helvet}
@@ -9,89 +11,58 @@
 
 \renewcommand{\familydefault}{\sfdefault}
 
-\definecolor{Ink}{HTML}{172026}
-\definecolor{MutedInk}{HTML}{52616B}
-\definecolor{RuleGrey}{HTML}{D8DEE3}
-\definecolor{PanelGrey}{HTML}{F4F6F7}
-\definecolor{Accent}{HTML}{1F6F78}
-\definecolor{AccentSoft}{HTML}{E7F1F3}
-\definecolor{Warn}{HTML}{9B5C16}
-\definecolor{WarnSoft}{HTML}{FFF4E3}
+\definecolor{PrimaryBlue}{HTML}{1F4E79}
+\definecolor{PrimaryBlueDark}{HTML}{173B5C}
+\definecolor{SecondaryTeal}{HTML}{2A7F78}
+\definecolor{WarmAccent}{HTML}{C56B2C}
+\definecolor{LightBlue}{HTML}{EAF2F8}
+\definecolor{LightTeal}{HTML}{E8F4F2}
+\definecolor{TextInk}{HTML}{1B2631}
+\definecolor{MutedText}{HTML}{5D6D7E}
 
-\setbeamercolor{normal text}{fg=Ink,bg=white}
-\setbeamercolor{structure}{fg=Accent}
-\setbeamercolor{frametitle}{fg=Ink,bg=white}
-\setbeamercolor{title}{fg=Ink}
-\setbeamercolor{subtitle}{fg=MutedInk}
-\setbeamercolor{author}{fg=MutedInk}
-\setbeamercolor{institute}{fg=MutedInk}
-\setbeamercolor{date}{fg=MutedInk}
-\setbeamercolor{item}{fg=Accent}
-\setbeamercolor{subitem}{fg=Accent}
-\setbeamercolor{block title}{fg=Ink,bg=AccentSoft}
-\setbeamercolor{block body}{fg=Ink,bg=PanelGrey}
-\setbeamercolor{block title example}{fg=Ink,bg=AccentSoft}
-\setbeamercolor{block body example}{fg=Ink,bg=PanelGrey}
-\setbeamercolor{block title alerted}{fg=Ink,bg=WarnSoft}
-\setbeamercolor{block body alerted}{fg=Ink,bg=PanelGrey}
-\setbeamercolor{footline}{fg=MutedInk,bg=white}
+\setbeamercolor{palette primary}{fg=white,bg=PrimaryBlue}
+\setbeamercolor{palette secondary}{fg=white,bg=SecondaryTeal}
+\setbeamercolor{palette tertiary}{fg=white,bg=PrimaryBlueDark}
+\setbeamercolor{palette quaternary}{fg=white,bg=WarmAccent}
+\setbeamercolor{structure}{fg=PrimaryBlue}
+\setbeamercolor{normal text}{fg=TextInk,bg=white}
+\setbeamercolor{frametitle}{fg=white,bg=PrimaryBlue}
+\setbeamercolor{title}{fg=white,bg=PrimaryBlue}
+\setbeamercolor{subtitle}{fg=LightBlue,bg=PrimaryBlue}
+\setbeamercolor{author}{fg=white,bg=PrimaryBlue}
+\setbeamercolor{institute}{fg=LightBlue,bg=PrimaryBlue}
+\setbeamercolor{date}{fg=LightBlue,bg=PrimaryBlue}
+\setbeamercolor{block title}{fg=white,bg=PrimaryBlue}
+\setbeamercolor{block body}{fg=TextInk,bg=LightBlue}
+\setbeamercolor{block title example}{fg=white,bg=SecondaryTeal}
+\setbeamercolor{block body example}{fg=TextInk,bg=LightTeal}
+\setbeamercolor{block title alerted}{fg=white,bg=WarmAccent}
+\setbeamercolor{block body alerted}{fg=TextInk,bg=WarmAccent!12}
+\setbeamercolor{item}{fg=SecondaryTeal}
+\setbeamercolor{subitem}{fg=PrimaryBlue}
+\setbeamercolor{section in toc}{fg=PrimaryBlue}
+\setbeamercolor{subsection in toc}{fg=MutedText}
+\setbeamercolor{footline}{fg=MutedText,bg=white}
 
 \setbeamerfont{title}{size=\Huge,series=\bfseries}
 \setbeamerfont{subtitle}{size=\large}
-\setbeamerfont{author}{size=\normalsize}
-\setbeamerfont{institute}{size=\small}
-\setbeamerfont{date}{size=\small}
 \setbeamerfont{frametitle}{size=\Large,series=\bfseries}
-\setbeamerfont{framesubtitle}{size=\normalsize}
 \setbeamerfont{block title}{series=\bfseries}
 \setbeamerfont{footline}{size=\scriptsize}
 
 \setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{itemize item}{\raise0.2ex\hbox{\small$\bullet$}}
-\setbeamertemplate{itemize subitem}{\raise0.2ex\hbox{\tiny$\bullet$}}
-\setbeamertemplate{enumerate item}{\insertenumlabel.}
 \setbeamertemplate{blocks}[rounded][shadow=false]
-
-\setbeamertemplate{title page}{
-  \vbox{}
-  \vfill
-  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.9cm,rightskip=0.9cm]{title}
-    {\usebeamerfont{title}\inserttitle\par}
-    \vspace{0.2cm}
-    {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}
-    \vspace{0.7cm}
-    {\usebeamerfont{author}\usebeamercolor[fg]{author}\insertauthor\par}
-    \vspace{0.08cm}
-    {\usebeamerfont{institute}\usebeamercolor[fg]{institute}\insertinstitute\par}
-    \vspace{0.08cm}
-    {\usebeamerfont{date}\usebeamercolor[fg]{date}\insertdate\par}
-  \end{beamercolorbox}
-  \vfill
-  \begin{beamercolorbox}[wd=\paperwidth,ht=0.08cm]{structure}
-    \rule{\paperwidth}{0.08cm}
-  \end{beamercolorbox}
-}
-
-\setbeamertemplate{frametitle}{
-  \vspace{0.45cm}
-  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.55cm,rightskip=0.55cm]{frametitle}
-    \usebeamerfont{frametitle}\insertframetitle\par
-    \vspace{0.15cm}
-    {\color{RuleGrey}\rule{\dimexpr\paperwidth-1.1cm\relax}{0.4pt}}
-  \end{beamercolorbox}
-}
-
+\setbeamertemplate{itemize item}{\raise0.15ex\hbox{\scriptsize$\blacktriangleright$}}
+\setbeamertemplate{itemize subitem}{\raise0.15ex\hbox{\tiny$\bullet$}}
+\setbeamertemplate{enumerate item}{\insertenumlabel.}
+\setbeamertemplate{section in toc}[sections numbered]
 \setbeamertemplate{footline}{
   \hfill
-  \usebeamerfont{footline}
-  \usebeamercolor[fg]{footline}
-  \insertshorttitle\hspace{0.35cm}\insertframenumber/\inserttotalframenumber
-  \hspace{0.45cm}
-  \vspace{0.25cm}
+  \usebeamerfont{footline}\usebeamercolor[fg]{footline}
+  \insertframenumber/\inserttotalframenumber\hspace{0.45cm}\vspace{0.25cm}
 }
 
-\setbeamersize{text margin left=0.7cm,text margin right=0.7cm}
-
-\linespread{1.06}
+\setbeamersize{text margin left=0.8cm,text margin right=0.8cm}
+\linespread{1.04}
 
 \titlegraphic{}
