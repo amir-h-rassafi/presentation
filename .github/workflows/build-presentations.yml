@@ -1,0 +1,62 @@
+name: Build presentations
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  discover:
+    name: Discover presentations
+    runs-on: ubuntu-latest
+    outputs:
+      presentations: ${{ steps.presentations.outputs.presentations }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build presentation matrix
+        id: presentations
+        run: |
+          presentations="$(find presentations -mindepth 2 -maxdepth 2 -name main.tex -printf '%h\n' \
+            | sed 's#^presentations/##' \
+            | sort \
+            | jq -R -s -c 'split("\n")[:-1]')"
+          echo "presentations=${presentations}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.presentation }}
+    needs: discover
+    if: needs.discover.outputs.presentations != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        presentation: ${{ fromJson(needs.discover.outputs.presentations) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures
+
+      - name: Build PDF
+        run: |
+          mkdir -p "build/${{ matrix.presentation }}" dist
+          cd "presentations/${{ matrix.presentation }}"
+          latexmk -pdf -interaction=nonstopmode -halt-on-error \
+            -outdir="$GITHUB_WORKSPACE/build/${{ matrix.presentation }}" \
+            main.tex
+          cd "$GITHUB_WORKSPACE"
+          cp "build/${{ matrix.presentation }}/main.pdf" "dist/${{ matrix.presentation }}.pdf"
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-${{ matrix.presentation }}
+          path: dist/${{ matrix.presentation }}.pdf
+          if-no-files-found: error

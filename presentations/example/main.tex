@@ -1,0 +1,57 @@
+\documentclass[aspectratio=169]{beamer}
+
+\input{../../common/preamble}
+
+\title{Example Presentation}
+\subtitle{A reusable LaTeX Beamer starting point}
+\author{Your Name}
+\institute{Your Organization}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Agenda}
+  \tableofcontents
+\end{frame}
+
+\section{Context}
+
+\begin{frame}{Why This Repository Exists}
+  \begin{itemize}
+    \item Keep each presentation isolated in its own folder.
+    \item Share common theme and package settings across presentations.
+    \item Export every presentation as a separate PDF artifact in GitHub.
+  \end{itemize}
+\end{frame}
+
+\section{Example Content}
+
+\begin{frame}{A Simple Table}
+  \begin{table}
+    \centering
+    \begin{tabular}{lll}
+      \toprule
+      Item & Owner & Status \\
+      \midrule
+      Slides & You & Draft \\
+      CI export & GitHub Actions & Ready \\
+      PDF artifact & Workflow & Ready \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+\begin{frame}{Next Steps}
+  \begin{enumerate}
+    \item Duplicate this folder.
+    \item Rename the copied folder.
+    \item Edit \texttt{main.tex}.
+    \item Push to GitHub and download the generated PDF artifact.
+  \end{enumerate}
+\end{frame}
+
+\end{document}
