@@ -1,13 +1,97 @@
-\usetheme{Madrid}
-\usecolortheme{default}
+\usetheme{default}
 
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage[scaled=0.96]{helvet}
 \usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{xcolor}
+
+\renewcommand{\familydefault}{\sfdefault}
+
+\definecolor{Ink}{HTML}{172026}
+\definecolor{MutedInk}{HTML}{52616B}
+\definecolor{RuleGrey}{HTML}{D8DEE3}
+\definecolor{PanelGrey}{HTML}{F4F6F7}
+\definecolor{Accent}{HTML}{1F6F78}
+\definecolor{AccentSoft}{HTML}{E7F1F3}
+\definecolor{Warn}{HTML}{9B5C16}
+\definecolor{WarnSoft}{HTML}{FFF4E3}
+
+\setbeamercolor{normal text}{fg=Ink,bg=white}
+\setbeamercolor{structure}{fg=Accent}
+\setbeamercolor{frametitle}{fg=Ink,bg=white}
+\setbeamercolor{title}{fg=Ink}
+\setbeamercolor{subtitle}{fg=MutedInk}
+\setbeamercolor{author}{fg=MutedInk}
+\setbeamercolor{institute}{fg=MutedInk}
+\setbeamercolor{date}{fg=MutedInk}
+\setbeamercolor{item}{fg=Accent}
+\setbeamercolor{subitem}{fg=Accent}
+\setbeamercolor{block title}{fg=Ink,bg=AccentSoft}
+\setbeamercolor{block body}{fg=Ink,bg=PanelGrey}
+\setbeamercolor{block title example}{fg=Ink,bg=AccentSoft}
+\setbeamercolor{block body example}{fg=Ink,bg=PanelGrey}
+\setbeamercolor{block title alerted}{fg=Ink,bg=WarnSoft}
+\setbeamercolor{block body alerted}{fg=Ink,bg=PanelGrey}
+\setbeamercolor{footline}{fg=MutedInk,bg=white}
+
+\setbeamerfont{title}{size=\Huge,series=\bfseries}
+\setbeamerfont{subtitle}{size=\large}
+\setbeamerfont{author}{size=\normalsize}
+\setbeamerfont{institute}{size=\small}
+\setbeamerfont{date}{size=\small}
+\setbeamerfont{frametitle}{size=\Large,series=\bfseries}
+\setbeamerfont{framesubtitle}{size=\normalsize}
+\setbeamerfont{block title}{series=\bfseries}
+\setbeamerfont{footline}{size=\scriptsize}
 
 \setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{itemize item}{\raise0.2ex\hbox{\small$\bullet$}}
+\setbeamertemplate{itemize subitem}{\raise0.2ex\hbox{\tiny$\bullet$}}
+\setbeamertemplate{enumerate item}{\insertenumlabel.}
+\setbeamertemplate{blocks}[rounded][shadow=false]
+
+\setbeamertemplate{title page}{
+  \vbox{}
+  \vfill
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.9cm,rightskip=0.9cm]{title}
+    {\usebeamerfont{title}\inserttitle\par}
+    \vspace{0.2cm}
+    {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}
+    \vspace{0.7cm}
+    {\usebeamerfont{author}\usebeamercolor[fg]{author}\insertauthor\par}
+    \vspace{0.08cm}
+    {\usebeamerfont{institute}\usebeamercolor[fg]{institute}\insertinstitute\par}
+    \vspace{0.08cm}
+    {\usebeamerfont{date}\usebeamercolor[fg]{date}\insertdate\par}
+  \end{beamercolorbox}
+  \vfill
+  \begin{beamercolorbox}[wd=\paperwidth,ht=0.08cm]{structure}
+    \rule{\paperwidth}{0.08cm}
+  \end{beamercolorbox}
+}
+
+\setbeamertemplate{frametitle}{
+  \vspace{0.45cm}
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.55cm,rightskip=0.55cm]{frametitle}
+    \usebeamerfont{frametitle}\insertframetitle\par
+    \vspace{0.15cm}
+    {\color{RuleGrey}\rule{\dimexpr\paperwidth-1.1cm\relax}{0.4pt}}
+  \end{beamercolorbox}
+}
+
+\setbeamertemplate{footline}{
+  \hfill
+  \usebeamerfont{footline}
+  \usebeamercolor[fg]{footline}
+  \insertshorttitle\hspace{0.35cm}\insertframenumber/\inserttotalframenumber
+  \hspace{0.45cm}
+  \vspace{0.25cm}
+}
+
+\setbeamersize{text margin left=0.7cm,text margin right=0.7cm}
+
+\linespread{1.06}
 
 \titlegraphic{}
