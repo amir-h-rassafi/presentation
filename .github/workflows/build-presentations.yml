@@ -60,3 +60,22 @@ jobs:
           name: presentation-${{ matrix.presentation }}
           path: dist/${{ matrix.presentation }}.pdf
           if-no-files-found: error
+
+      - name: Export HTML deck if available
+        id: html
+        run: |
+          if [ -d "presentations/${{ matrix.presentation }}/web" ]; then
+            mkdir -p "dist/${{ matrix.presentation }}-html"
+            cp -R "presentations/${{ matrix.presentation }}/web/." "dist/${{ matrix.presentation }}-html/"
+            echo "has_html=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_html=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload HTML artifact
+        if: steps.html.outputs.has_html == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: presentation-${{ matrix.presentation }}-html
+          path: dist/${{ matrix.presentation }}-html
+          if-no-files-found: error

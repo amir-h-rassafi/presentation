@@ -11,3 +11,5 @@
 
 build/
 dist/
+
+presentations/*/main.pdf

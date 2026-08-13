@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Search: PostgreSQL pg_trgm to Elasticsearch BM25</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+  <style>
+    :root {
+      --r-main-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --r-heading-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --r-heading-color: #173b5c;
+      --r-main-color: #1b2631;
+      --r-link-color: #2a7f78;
+      --r-selection-background-color: #c56b2c;
+    }
+
+    body { background: #f7f9fb; }
+    .reveal { font-size: 34px; }
+    .reveal .slides { text-align: left; }
+    .reveal h1, .reveal h2, .reveal h3 { letter-spacing: 0; text-transform: none; }
+    .reveal h1 { font-size: 2.25em; }
+    .reveal h2 { font-size: 1.55em; border-bottom: 5px solid #c56b2c; padding-bottom: .18em; }
+    .reveal h3 { color: #2a7f78; }
+    .reveal p, .reveal li { line-height: 1.28; }
+    .reveal ul { margin-left: 1.1em; }
+    .reveal li { margin: .28em 0; }
+    .reveal code { color: #173b5c; background: #eaf2f8; padding: .05em .22em; border-radius: 5px; }
+
+    .title-slide {
+      background: linear-gradient(135deg, #1f4e79 0%, #173b5c 62%, #2a7f78 100%);
+      color: #fff;
+      padding: 1.1em 1.25em;
+      min-height: 74vh;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .title-slide h1, .title-slide h2, .title-slide p { color: #fff; }
+    .title-slide h1 { max-width: 980px; }
+    .title-slide .subtitle { color: #d9edf7; font-size: 1.1em; margin-top: .35em; }
+    .title-slide .meta { color: #d9edf7; margin-top: 1.8em; font-size: .68em; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; align-items: start; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7em; }
+    .card {
+      background: #fff;
+      border: 1px solid #d8e2ea;
+      border-left: 7px solid #1f4e79;
+      border-radius: 8px;
+      padding: .65em .75em;
+      box-shadow: 0 10px 26px rgba(23, 59, 92, .08);
+    }
+    .card.teal { border-left-color: #2a7f78; }
+    .card.orange { border-left-color: #c56b2c; }
+    .metric {
+      background: #fff;
+      border-radius: 8px;
+      padding: .55em .7em;
+      border-top: 7px solid #2a7f78;
+      text-align: center;
+      min-height: 4.2em;
+    }
+    .metric strong { display: block; color: #173b5c; font-size: 1.65em; line-height: 1; }
+    .small { font-size: .72em; color: #5d6d7e; }
+    .diagram-wrap {
+      background: #fff;
+      border: 1px solid #d8e2ea;
+      border-radius: 8px;
+      padding: .45em;
+      box-shadow: 0 8px 22px rgba(23, 59, 92, .08);
+    }
+    .mermaid { font-size: 22px; text-align: center; }
+    .reveal table { font-size: .74em; width: 100%; border-collapse: collapse; }
+    .reveal th { background: #1f4e79; color: #fff; }
+    .reveal th, .reveal td { padding: .42em .55em; border: 1px solid #d8e2ea; }
+    .reveal tr:nth-child(even) td { background: #f3f8fb; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+    <section class="title-slide">
+      <h1>Running Search</h1>
+      <p class="subtitle">From PostgreSQL <code>pg_trgm</code> to Elasticsearch BM25</p>
+      <p class="meta">Amir Hossein Rassafi · May 2026 · amir-h-rassafi.github.io</p>
+    </section>
+
+    <section>
+      <h2>The Story</h2>
+      <div class="three-col">
+        <div class="card"><h3>What</h3><p><code>pg_trgm</code>, BM25, and tokenization.</p></div>
+        <div class="card teal"><h3>Why</h3><p>25M names, 15s queries, CPU saturation.</p></div>
+        <div class="card orange"><h3>How</h3><p>Replicated search index, analyzers, benchmarks, rollout.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Problem</h2>
+      <div class="two-col">
+        <div>
+          <ul>
+            <li>Name search over almost 25M records.</li>
+            <li>PostgreSQL with <code>pg_trgm</code> handled fuzzy matching.</li>
+            <li>Some queries took around 15 seconds.</li>
+            <li>A few concurrent requests could saturate database CPU.</li>
+          </ul>
+        </div>
+        <div class="diagram-wrap">
+          <pre class="mermaid">
+flowchart LR
+  U[User query] --> API[Search API]
+  API --> PG[(PostgreSQL<br/>25M rows)]
+  PG --> TRGM[pg_trgm<br/>GIN / GiST]
+  TRGM --> LAT[~15s latency]
+  TRGM --> CPU[CPU saturation]
+          </pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Why Scaling Was Not Enough</h2>
+      <div class="three-col">
+        <div class="metric"><strong>16</strong><span>CPU cores</span></div>
+        <div class="metric"><strong>64GB</strong><span>memory</span></div>
+        <div class="metric"><strong>4</strong><span>requests could consume CPU</span></div>
+      </div>
+      <p>More CPU helped concurrency, but did not solve the single-query latency problem.</p>
+    </section>
+
+    <section>
+      <h2><code>pg_trgm</code> Intuition</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3>Text similarity</h3>
+          <p>Strings are sliced into 3-character fragments. Similar names share many fragments.</p>
+        </div>
+        <div class="card teal">
+          <h3>Example</h3>
+          <p><code>search</code> and <code>serch</code> share 4 fragments out of 9 unique fragments.</p>
+          <p><strong>similarity = 4 / 9 = 0.44</strong></p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>BM25 Intuition</h2>
+      <ul>
+        <li>BM25 ranks documents by search relevance.</li>
+        <li>Rare terms carry more weight.</li>
+        <li>Repeated terms help with diminishing returns.</li>
+        <li>Short, focused documents are rewarded.</li>
+      </ul>
+      <div class="card orange"><strong>Key distinction:</strong> <code>pg_trgm</code> is similarity. BM25 is relevance scoring over tokens.</div>
+    </section>
+
+    <section>
+      <h2>Tokenization Changes The Score</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3>Keyword tokenizer</h3>
+          <p><code>apple apple banana</code></p>
+          <p>One complete token.</p>
+        </div>
+        <div class="card teal">
+          <h3>Word tokenizer</h3>
+          <p><code>apple</code>, <code>apple</code>, <code>banana</code></p>
+          <p>Three searchable terms.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Migration Requirements</h2>
+      <ul>
+        <li>Deploy Elasticsearch quickly with low operational overhead.</li>
+        <li>Replicate required PostgreSQL data into Elasticsearch.</li>
+        <li>Preserve fuzzy, language-agnostic name search behavior.</li>
+        <li>Benchmark old and new ranking behavior.</li>
+        <li>Prove quality before production rollout.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Target Architecture</h2>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+flowchart LR
+  PG[(PostgreSQL<br/>source of truth)] -->|CDC| DS[GCP Datastream]
+  DS --> BQ[(BigQuery<br/>append-only replica)]
+  BQ -->|lag-aware batches| IDX[Indexing service<br/>parallel workers]
+  IDX -->|bulk upsert/delete| ES[(Elasticsearch<br/>search index)]
+  USERS[Users] --> API[Search API]
+  API --> ES
+  BQ -.debug history.-> IDX
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Why BigQuery In The Middle?</h2>
+      <ul>
+        <li>Append-only change history for debugging.</li>
+        <li>Time partitioning helped control cost.</li>
+        <li>Every insert, update, and delete stayed inspectable.</li>
+        <li>It made consistency issues easier to investigate.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Deterministic Indexer Routing</h2>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+flowchart TB
+  BQ[(BigQuery change rows)] --> R{hash(row_id)<br/>shard key}
+  R --> W1[Worker 1<br/>shards 0-3]
+  R --> W2[Worker 2<br/>shards 4-7]
+  R --> W3[Worker 3<br/>shards 8-11]
+  R --> W4[Worker 4<br/>shards 12-15]
+  W1 --> ES[(Elasticsearch)]
+  W2 --> ES
+  W3 --> ES
+  W4 --> ES
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Lag-Aware Processing</h2>
+      <div class="two-col">
+        <div>
+          <ul>
+            <li>Do not process the absolute latest timestamp.</li>
+            <li>Read from a small window in the past.</li>
+            <li>Use Datastream metadata and sequence ordering.</li>
+            <li>In this case, 15 minutes of freshness lag was acceptable.</li>
+          </ul>
+        </div>
+        <div class="card orange"><strong>Reason:</strong> newest visible data in BigQuery does not always mean the whole CDC pipeline has settled.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Checkpoint And Replay</h2>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant I as Indexer
+  participant ES as Elasticsearch
+  participant BQ as BigQuery
+  I->>ES: Read checkpoint
+  ES-->>I: timestamp + LSN + document ID
+  I->>BQ: Query newer rows behind safety lag
+  BQ-->>I: Ordered change batch
+  loop deterministic order
+    I->>ES: UPSERT or DELETE using PostgreSQL row ID
+  end
+  I->>ES: Persist checkpoint after successful batch
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Name Index Design</h2>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+flowchart TB
+  N((name field)) --> A[standard text<br/>BM25]
+  N --> K[normalized keyword<br/>exact boost]
+  N --> P[prefix<br/>partial input]
+  N --> G[character n-gram<br/>typo tolerance]
+  N --> S[word shingle<br/>phrase context]
+  A --> Q[combined query scoring]
+  K --> Q
+  P --> Q
+  G --> Q
+  S --> Q
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Analyzer Examples</h2>
+      <table>
+        <thead><tr><th>Analyzer</th><th>Example</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td>Prefix</td><td><code>pro, prog, proge...</code></td><td>Beginning-of-name search</td></tr>
+          <tr><td>N-gram</td><td><code>pro, rog, oge, gem, ema</code></td><td>Trigram-like fuzzy matching</td></tr>
+          <tr><td>Shingle</td><td><code>progema fastighets</code></td><td>Longer multi-word names</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Benchmark And Rollout</h2>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+flowchart LR
+  H[Historical queries] --> OLD[PostgreSQL pg_trgm]
+  H --> NEW[Elasticsearch]
+  V[Generated typo/OCR/partial variants] --> OLD
+  V --> NEW
+  OLD --> M[MRR + mismatch analysis]
+  NEW --> M
+  M --> E[Expert side-by-side review]
+  E --> D{Quality acceptable?}
+  D -->|yes| R[Rollout]
+  D -->|no| T[Tune analyzers + boosts]
+  T --> NEW
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Outcome</h2>
+      <table>
+        <thead><tr><th>Dimension</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>
+          <tr><td>Search engine</td><td>PostgreSQL <code>pg_trgm</code></td><td>Elasticsearch</td></tr>
+          <tr><td>Dataset</td><td>25M source rows</td><td>25M replicated docs</td></tr>
+          <tr><td>Latency</td><td>up to ~15s</td><td>up to ~100ms</td></tr>
+          <tr><td>Fuzzy behavior</td><td>native trigram</td><td>multi-field analyzers</td></tr>
+          <tr><td>Freshness</td><td>immediate DB read</td><td>~15 min lag</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Closing</h2>
+      <div class="card teal">
+        <p>Elasticsearch did not replace <code>pg_trgm</code> directly.</p>
+        <p>It recreated the useful signals through analyzers, weighting, benchmarks, and a replayable indexing pipeline.</p>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#EAF2F8',
+      primaryTextColor: '#1B2631',
+      primaryBorderColor: '#1F4E79',
+      lineColor: '#2A7F78',
+      secondaryColor: '#E8F4F2',
+      tertiaryColor: '#FDEBD0',
+      fontFamily: 'Inter, system-ui, sans-serif'
+    }
+  });
+  Reveal.initialize({
+    hash: true,
+    slideNumber: true,
+    transition: 'slide',
+    width: 1280,
+    height: 720,
+    margin: 0.06
+  });
+</script>
+</body>
+</html>

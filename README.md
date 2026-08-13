@@ -40,6 +40,17 @@ make clean
 
 PDFs are written to `dist/`.
 
+## HTML Builds
+
+Build the HTML version of a presentation when it has a `web/` folder:
+
+```sh
+make PRESENTATION=search-migration html
+```
+
+The HTML export is written to `dist/search-migration-html/index.html`. GitHub Actions uploads it as a separate artifact when available.
+
+
 ## GitHub Export
 
 The workflow in `.github/workflows/build-presentations.yml` discovers every
