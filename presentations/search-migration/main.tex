@@ -10,6 +10,10 @@
 
 \begin{document}
 
+% Slide title rule: content slide titles must use the story section as the main piece,
+% followed by a short 1-5 word current-slide label: Section: Slide Label.
+% Keep the longer explanatory wording only on The Story agenda slide.
+
 \begin{frame}[plain]
   \vspace*{0.25cm}
   \begin{columns}[T,totalwidth=\textwidth]
@@ -46,7 +50,7 @@
 \begin{frame}{The Story}
   \vspace{0.2cm}
   \begin{enumerate}
-    \item \hyperlink{sec:problem}{\textbf{Problem}}\\[-0.02cm]
+    \item \hyperlink{sec:problem}{\textbf{Problem \& Goal}}\\[-0.02cm]
       \hyperlink{sec:problem}{{\small\textcolor{MutedText}{Why and how this became an initiative}}}
     \item \hyperlink{sec:search-concepts}{\textbf{Search Concepts}}\\[-0.02cm]
       \hyperlink{sec:search-concepts}{{\small\textcolor{MutedText}{Text similarity vs search}}}
@@ -61,9 +65,10 @@
   \end{enumerate}
 \end{frame}
 
-\section{Problem}
+\section{Problem \& Goal}
+\subsection{Why and how this became an initiative}
 
-\begin{frame}{Goal}
+\begin{frame}{Problem \& Goal: Initiative}
   \hypertarget{sec:problem}{}
   \begin{itemize}
     \item Name search in scale of 10M-100M records
@@ -78,7 +83,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Why Not Just Scale PostgreSQL?}
+\begin{frame}{Problem \& Goal: Scaling PostgreSQL}
   \begin{itemize}
     \item The database already had 16 CPU cores and 64 GB memory.
     \item More CPU helped concurrency more than single-query latency.
@@ -88,8 +93,9 @@
 \end{frame}
 
 \section{Search Concepts}
+\subsection{Text similarity vs search}
 
-\begin{frame}{What \texttt{pg\_trgm} Does}
+\begin{frame}{Search Concepts: Trigrams}
   \hypertarget{sec:search-concepts}{}
   \begin{itemize}
     \item It compares text by slicing strings into 3-character fragments.
@@ -104,7 +110,7 @@
   \end{exampleblock}
 \end{frame}
 
-\begin{frame}{Similarity Intuition}
+\begin{frame}{Search Concepts: Similarity}
   \begin{columns}[T]
     \column{0.48\textwidth}
       \begin{block}{Shared fragments}
@@ -127,7 +133,7 @@
   \end{center}
 \end{frame}
 
-\begin{frame}{What BM25 Does}
+\begin{frame}{Search Concepts: BM25}
   \begin{itemize}
     \item BM25 ranks documents by search relevance.
     \item Rare query terms carry more weight.
@@ -141,7 +147,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Tokenization Changes Everything}
+\begin{frame}{Search Concepts: Tokenization}
   \begin{columns}[T]
     \column{0.48\textwidth}
       \begin{block}{Keyword tokenizer}
@@ -163,8 +169,9 @@
 \end{frame}
 
 \section{Migration Design}
+\subsection{Moving data without overloading PostgreSQL}
 
-\begin{frame}{Migration Requirements}
+\begin{frame}{Migration Design: Requirements}
   \hypertarget{sec:migration-design}{}
   \begin{itemize}
     \item Deploy Elasticsearch quickly with low operational overhead.
@@ -175,7 +182,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Chosen Data Path}
+\begin{frame}{Migration Design: Data Path}
   \begin{center}
     \begin{tabular}{c}
       PostgreSQL source of truth \\
@@ -196,7 +203,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Document Identity}
+\begin{frame}{Migration Design: Document Identity}
   \begin{itemize}
     \item Elasticsearch document ID reused the PostgreSQL row ID.
     \item Engineers could debug the same entity across systems.
@@ -205,7 +212,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Indexer Shape}
+\begin{frame}{Migration Design: Indexer Shape}
   \begin{itemize}
     \item Indexer ran as a set of parallel workers.
     \item Records were routed by a deterministic sharding key.
@@ -219,7 +226,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Do Not Chase The Latest Timestamp}
+\begin{frame}{Migration Design: Timestamp Lag}
   \begin{itemize}
     \item BigQuery visibility can lag behind source database changes.
     \item Large transactions and CDC apply behavior can reorder what is visible.
@@ -233,7 +240,7 @@
   \end{alertblock}
 \end{frame}
 
-\begin{frame}{Checkpointing}
+\begin{frame}{Migration Design: Checkpointing}
   \begin{center}
     \begin{tabular}{ll}
       1 & Read latest checkpoint from Elasticsearch \\
@@ -251,8 +258,9 @@
 \end{frame}
 
 \section{Index Design}
+\subsection{Recreating fuzzy-name signals in Elasticsearch}
 
-\begin{frame}{One Name, Multiple Views}
+\begin{frame}{Index Design: Field Views}
   \hypertarget{sec:index-design}{}
   \begin{center}
     \begin{tabular}{ll}
@@ -269,7 +277,7 @@
   \end{center}
 \end{frame}
 
-\begin{frame}{Prefix Matching}
+\begin{frame}{Index Design: Prefix Matching}
   \begin{exampleblock}{Input}
     \texttt{progema}
   \end{exampleblock}
@@ -285,7 +293,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Character N-Grams}
+\begin{frame}{Index Design: Character N-Grams}
   \begin{exampleblock}{Input}
     \texttt{progema}
   \end{exampleblock}
@@ -301,7 +309,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Word Shingles}
+\begin{frame}{Index Design: Word Shingles}
   \begin{exampleblock}{Input}
     \texttt{progema fastighets ab}
   \end{exampleblock}
@@ -322,7 +330,7 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Query Strategy}
+\begin{frame}{Index Design: Query Strategy}
   \begin{itemize}
     \item Combine several name signals at query time.
     \item Boost exact and normalized matches.
@@ -338,8 +346,9 @@
 \end{frame}
 
 \section{Validation}
+\subsection{Proving relevance before production rollout}
 
-\begin{frame}{Benchmarking Layer 1: Backtesting}
+\begin{frame}{Validation: Backtesting}
   \hypertarget{sec:validation}{}
   \begin{itemize}
     \item Use historical user queries.
@@ -349,7 +358,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Benchmarking Layer 2: Generated Cases}
+\begin{frame}{Validation: Generated Cases}
   \begin{itemize}
     \item Generate OCR-like errors.
     \item Add human typos and missing characters.
@@ -359,7 +368,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Benchmarking Layer 3: Human Judgement}
+\begin{frame}{Validation: Human Judgement}
   \begin{itemize}
     \item Run the same query against both systems.
     \item Ask domain experts which result looked better.
@@ -373,8 +382,9 @@
 \end{frame}
 
 \section{Outcome}
+\subsection{Latency gains, trade-offs, and lessons}
 
-\begin{frame}{Before And After}
+\begin{frame}{Outcome: Before And After}
   \hypertarget{sec:outcome}{}
   \begin{center}
     \begin{tabular}{lll}
@@ -391,7 +401,7 @@
   \end{center}
 \end{frame}
 
-\begin{frame}{Lessons}
+\begin{frame}{Outcome: Lessons}
   \begin{itemize}
     \item Search migration is not only a database replacement.
     \item The replication path needs observability and replayability.
@@ -401,7 +411,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Closing}
+\begin{frame}{Outcome: Closing}
   \begin{center}
     \Large
     Elasticsearch did not replace \texttt{pg\_trgm} directly.\\[0.35cm]
