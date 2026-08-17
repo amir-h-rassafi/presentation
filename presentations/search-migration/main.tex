@@ -71,101 +71,143 @@
 \begin{frame}{Problem \& Goal: Initiative}
   \hypertarget{sec:problem}{}
   \begin{itemize}
-    \item Name search in scale of 10M-100M records
-    \item Don't under perform current PostgreSQL with \texttt{pg\_trgm} fuzzy matching behaviour.
-    \item Some queries took around 15 seconds.
-    \item A few concurrent requests could saturate database CPU.
+    \item The current search worked and users trusted its fuzzy matching behavior.
+    \item It ran on PostgreSQL with 16 CPU cores and 64 GB memory.
+    \item At around 10M records, p99 latency was about 10 seconds.
+    \item Maximum sustainable throughput was around 2 requests per second.
   \end{itemize}
 
   \vspace{0.5cm}
   \begin{block}{Goal}
-    Bring search latency under 1 second without breaking ranking behavior users already trusted.
+    Bring p99 search latency under 1 second, increase throughput by at least 10x, and preserve the ranking behavior users already trusted.
   \end{block}
 \end{frame}
 
 \begin{frame}{Problem \& Goal: Scaling PostgreSQL}
-  \begin{itemize}
-    \item The database already had 16 CPU cores and 64 GB memory.
-    \item More CPU helped concurrency more than single-query latency.
-    \item Four requests could still consume all CPU.
-    \item Search load was competing with the source-of-truth database.
-  \end{itemize}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{itemize}
+        \item The database already had 16 CPU cores and 64 GB memory.
+        \item More CPU helped concurrency more than single-query latency.
+        \item Four requests could still consume all CPU.
+        \item Search load was competing with the source-of-truth database.
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \begin{block}{TBD: scaling benchmark}
+        \small
+        \begin{tabular}{@{}ll@{}}
+          Current p99 & \textcolor{WarmAccent}{\rule{3.2cm}{0.18cm}} 10s \\
+          Target p99 & \textcolor{SecondaryTeal}{\rule{0.35cm}{0.18cm}} <1s \\
+          Current RPS & \textcolor{WarmAccent}{\rule{0.45cm}{0.18cm}} 2 \\
+          Target RPS & \textcolor{SecondaryTeal}{\rule{3.8cm}{0.18cm}} $\geq$20
+        \end{tabular}
+      \end{block}
+  \end{columns}
 \end{frame}
 
 \section{Search Concepts}
 \subsection{Text similarity vs search}
 
-\begin{frame}{Search Concepts: Trigrams}
+\begin{frame}{Search Concepts: Trigram Similarity}
   \hypertarget{sec:search-concepts}{}
-  \begin{itemize}
-    \item It compares text by slicing strings into 3-character fragments.
-    \item Similar strings share many trigrams.
-    \item This makes it naturally good for typos, spacing differences, and fuzzy names.
-  \end{itemize}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.52\textwidth}
+      \begin{itemize}
+        \item It compares text by slicing strings into 3-character fragments.
+        \item Similar strings share many trigrams.
+        \item Good for typos, spacing differences, and fuzzy names.
+      \end{itemize}
 
-  \vspace{0.35cm}
-  \begin{exampleblock}{Example}
-    \texttt{search} $\rightarrow$ \texttt{\{ s, se, sea, ear, arc, rch, ch \}}\\
-    \texttt{serch} $\rightarrow$ \texttt{\{ s, se, ser, erc, rch, ch \}}
-  \end{exampleblock}
-\end{frame}
+      \vspace{0.25cm}
+      \begin{exampleblock}{Example}
+        \texttt{search} $\rightarrow$ \texttt{\{ s, se, sea, ear, arc, rch, ch \}}\\
+        \texttt{serch} $\rightarrow$ \texttt{\{ s, se, ser, erc, rch, ch \}}
+      \end{exampleblock}
 
-\begin{frame}{Search Concepts: Similarity}
-  \begin{columns}[T]
-    \column{0.48\textwidth}
+    \column{0.42\textwidth}
       \begin{block}{Shared fragments}
-        \centering
-        \Large 4
+        \centering\Large 4
       \end{block}
 
-    \column{0.48\textwidth}
       \begin{block}{Unique fragments}
-        \centering
-        \Large 9
+        \centering\Large 9
       \end{block}
+
+      \vspace{0.2cm}
+      \begin{center}
+        \large similarity = 4 / 9 = 0.44
+      \end{center}
   \end{columns}
-
-  \vspace{0.6cm}
-  \begin{center}
-    \Large
-    similarity = shared trigrams / total unique trigrams\\[0.2cm]
-    similarity = 4 / 9 = 0.44
-  \end{center}
 \end{frame}
 
-\begin{frame}{Search Concepts: BM25}
-  \begin{itemize}
-    \item BM25 ranks documents by search relevance.
-    \item Rare query terms carry more weight.
-    \item Repeated terms help, but with diminishing returns.
-    \item Short, focused documents are rewarded compared with noisy ones.
-  \end{itemize}
-
-  \vspace{0.45cm}
-  \begin{block}{Key distinction}
-    \texttt{pg\_trgm} is text similarity. BM25 is relevance scoring over indexed terms.
-  \end{block}
-\end{frame}
-
-\begin{frame}{Search Concepts: Tokenization}
-  \begin{columns}[T]
-    \column{0.48\textwidth}
-      \begin{block}{Keyword tokenizer}
-        \texttt{apple apple banana}\\[0.2cm]
-        $\rightarrow$ one token
-      \end{block}
-
-    \column{0.48\textwidth}
-      \begin{block}{Word tokenizer}
+\begin{frame}{Search Concepts: BM25 Formula}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.44\textwidth}
+      \begin{block}{Analyzer creates terms}
         \texttt{apple apple banana}\\[0.2cm]
         $\rightarrow$ \texttt{apple}, \texttt{apple}, \texttt{banana}
       \end{block}
+
+      \begin{block}{Base idea}
+        \centering
+        $\text{score} \approx tf \times idf$
+      \end{block}
+
+      \begin{itemize}
+        \item $tf$: term frequency in this document
+        \item $idf$: rarity across all documents
+      \end{itemize}
+
+    \column{0.52\textwidth}
+      \begin{block}{BM25 extension}
+        \scriptsize
+        \[
+          \sum_{t \in q} \operatorname{idf}(t) \cdot
+          \frac{tf(t,d)(k_1 + 1)}
+          {tf(t,d) + k_1\left(1 - b + b\frac{|d|}{avgdl}\right)}
+        \]
+      \end{block}
+
+      \begin{itemize}
+        \item Rare terms still matter most.
+        \item Repeated terms help, but the gain saturates.
+        \item Long noisy documents are normalized against average length.
+      \end{itemize}
   \end{columns}
 
-  \vspace{0.45cm}
-  \begin{center}
-    The analyzer creates the terms. The terms drive BM25 scores.
-  \end{center}
+  \vspace{0.05cm}
+  \begin{block}{Key distinction}
+    \texttt{pg\_trgm} is text similarity. BM25 scores analyzed search terms.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Search Concepts: Matching Tradeoffs}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{block}{Similarity wins}
+        Query: \texttt{jon smyth}\\[0.15cm]
+        Record: \texttt{john smith}
+      \end{block}
+
+      \begin{itemize}
+        \item Same name intent, different spelling.
+        \item Shared character fragments keep the match close.
+        \item BM25 may miss or weaken it because exact terms differ.
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \begin{block}{BM25 wins}
+        Query: \texttt{senior backend engineer}\\[0.15cm]
+        Record: \texttt{backend engineer with search experience}
+      \end{block}
+
+      \begin{itemize}
+        \item Multiple terms contribute to relevance.
+        \item Rare terms carry more signal than common ones.
+        \item Similarity alone treats this as broad text overlap.
+      \end{itemize}
+  \end{columns}
 \end{frame}
 
 \section{Migration Design}
