@@ -2,28 +2,72 @@
 
 \input{../../common/preamble}
 
-\title{Running Search}
-\subtitle{From PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25}
+\title{Migrating Search}
+\subtitle{From PostgreSQL \texttt{(pg\_trgm)} to Elasticsearch \texttt{(BM25)}}
 \author{Amir Hossein Rassafi}
-\institute{amir-h-rassafi.github.io}
+\institute{Head of Platform at Condukt\\amir-h-rassafi.github.io}
 \date{May 2026}
 
 \begin{document}
 
-\begin{frame}
-  \titlepage
+\begin{frame}[plain]
+  \vspace*{0.25cm}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.5\textwidth}
+      \includegraphics[height=0.58cm]{assets/logos/condukt-logo-black.png}
+    \column{0.5\textwidth}
+      \raggedleft\includegraphics[height=0.62cm]{assets/logos/elasticsearch.png}
+  \end{columns}
+
+  \vfill
+
+  \begin{beamercolorbox}[wd=\textwidth,sep=0.48cm,center,rounded=true]{title}
+    {\Huge\bfseries\inserttitle\par}
+    \vspace{0.18cm}
+    {\large\insertsubtitle\par}
+  \end{beamercolorbox}
+
+  \vspace{0.78cm}
+  \begin{center}
+    {\Large\bfseries\textcolor{PrimaryBlue}{\insertauthor}\par}
+    \vspace{0.14cm}
+    {\normalsize\bfseries\textcolor{SecondaryTeal}{Head of Platform at Condukt}\par}
+    \vspace{0.08cm}
+    {\small\textcolor{MutedText}{amir-h-rassafi.github.io}\par}
+  \end{center}
+
+  \vfill
+
+  \begin{center}
+    {\small\textcolor{MutedText}{\insertdate}}
+  \end{center}
 \end{frame}
 
 \begin{frame}{The Story}
-  \tableofcontents
+  \vspace{0.2cm}
+  \begin{enumerate}
+    \item \hyperlink{sec:problem}{\textbf{Problem}}\\[-0.02cm]
+      \hyperlink{sec:problem}{{\small\textcolor{MutedText}{Why and how this became an initiative}}}
+    \item \hyperlink{sec:search-concepts}{\textbf{Search Concepts}}\\[-0.02cm]
+      \hyperlink{sec:search-concepts}{{\small\textcolor{MutedText}{Text similarity vs search}}}
+    \item \hyperlink{sec:migration-design}{\textbf{Migration Design}}\\[-0.02cm]
+      \hyperlink{sec:migration-design}{{\small\textcolor{MutedText}{Moving data without overloading PostgreSQL}}}
+    \item \hyperlink{sec:index-design}{\textbf{Index Design}}\\[-0.02cm]
+      \hyperlink{sec:index-design}{{\small\textcolor{MutedText}{Recreating fuzzy-name signals in Elasticsearch}}}
+    \item \hyperlink{sec:validation}{\textbf{Validation}}\\[-0.02cm]
+      \hyperlink{sec:validation}{{\small\textcolor{MutedText}{Proving relevance before production rollout}}}
+    \item \hyperlink{sec:outcome}{\textbf{Outcome}}\\[-0.02cm]
+      \hyperlink{sec:outcome}{{\small\textcolor{MutedText}{Latency gains, trade-offs, and lessons}}}
+  \end{enumerate}
 \end{frame}
 
 \section{Problem}
 
-\begin{frame}{The Starting Point}
+\begin{frame}{Goal}
+  \hypertarget{sec:problem}{}
   \begin{itemize}
-    \item Name search over almost 25M records.
-    \item PostgreSQL with \texttt{pg\_trgm} handled fuzzy matching.
+    \item Name search in scale of 10M-100M records
+    \item Don't under perform current PostgreSQL with \texttt{pg\_trgm} fuzzy matching behaviour.
     \item Some queries took around 15 seconds.
     \item A few concurrent requests could saturate database CPU.
   \end{itemize}
@@ -46,6 +90,7 @@
 \section{Search Concepts}
 
 \begin{frame}{What \texttt{pg\_trgm} Does}
+  \hypertarget{sec:search-concepts}{}
   \begin{itemize}
     \item It compares text by slicing strings into 3-character fragments.
     \item Similar strings share many trigrams.
@@ -120,6 +165,7 @@
 \section{Migration Design}
 
 \begin{frame}{Migration Requirements}
+  \hypertarget{sec:migration-design}{}
   \begin{itemize}
     \item Deploy Elasticsearch quickly with low operational overhead.
     \item Replicate required PostgreSQL data into Elasticsearch.
@@ -207,6 +253,7 @@
 \section{Index Design}
 
 \begin{frame}{One Name, Multiple Views}
+  \hypertarget{sec:index-design}{}
   \begin{center}
     \begin{tabular}{ll}
       \toprule
@@ -293,6 +340,7 @@
 \section{Validation}
 
 \begin{frame}{Benchmarking Layer 1: Backtesting}
+  \hypertarget{sec:validation}{}
   \begin{itemize}
     \item Use historical user queries.
     \item Compare against results users actually selected.
@@ -327,6 +375,7 @@
 \section{Outcome}
 
 \begin{frame}{Before And After}
+  \hypertarget{sec:outcome}{}
   \begin{center}
     \begin{tabular}{lll}
       \toprule
