@@ -119,7 +119,7 @@
         \item Good for typos, spacing differences, and fuzzy names.
       \end{itemize}
 
-      \vspace{0.25cm}
+      \vspace{0.05cm}
       \begin{exampleblock}{Example}
         \texttt{search} $\rightarrow$ \texttt{\{ s, se, sea, ear, arc, rch, ch \}}\\
         \texttt{serch} $\rightarrow$ \texttt{\{ s, se, ser, erc, rch, ch \}}
@@ -138,6 +138,39 @@
       \begin{center}
         \large similarity = 4 / 9 = 0.44
       \end{center}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Search Concepts: Trigram Indexes}
+  \small
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.49\textwidth}
+      \begin{block}{Big-O intuition}
+        \begin{itemize}
+          \item Build query trigrams: $O(L)$
+          \item No index scan: $O(N \times L)$
+          \item Indexed search: $O(P + C \times L + C\log C)$
+        \end{itemize}
+      \end{block}
+
+      \begin{itemize}
+        \item $N$: rows, $L$: text length
+        \item $P$: index pages/postings touched
+        \item $C$: candidate rows rechecked
+      \end{itemize}
+
+    \column{0.47\textwidth}
+      \begin{block}{GIN}
+        Inverted trigram postings. Fast lookup, larger index, heavier writes.
+      \end{block}
+
+      \begin{block}{GiST}
+        Compact signature tree. More flexible, but lossy signatures can increase rechecks.
+      \end{block}
+
+      \begin{block}{p99 impact}
+        Common terms increase $P$ and $C$; recheck and sorting become the tail cost.
+      \end{block}
   \end{columns}
 \end{frame}
 
@@ -200,15 +233,51 @@
       \begin{block}{BM25 wins}
         Query: \texttt{senior backend engineer}\\[0.15cm]
         Record: \texttt{backend engineer with search experience}
+        \\[0.15cm]{\scriptsize With simple word / space tokenization}
       \end{block}
 
       \begin{itemize}
-        \item Multiple terms contribute to relevance.
+        \item Space-separated terms contribute to relevance.
         \item Rare terms carry more signal than common ones.
         \item Similarity alone treats this as broad text overlap.
       \end{itemize}
   \end{columns}
 \end{frame}
+
+\begin{frame}{Search Concepts: Query Fuzziness}
+  \small
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{block}{Query shape}
+        \texttt{match} analyzes text into terms and BM25 scores the matching documents.
+      \end{block}
+
+      \begin{itemize}
+        \item Exact filters cut the candidate set first.
+        \item Text clauses score the remaining candidates.
+        \item Boosts decide which fields matter more.
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \begin{block}{Fuzziness}
+        \texttt{fuzziness: AUTO} expands terms to nearby spellings.
+      \end{block}
+
+      \begin{itemize}
+        \item Better recall for typos and name variants.
+        \item More expanded terms means more work per query.
+        \item Prefix length and max expansions control latency.
+      \end{itemize}
+  \end{columns}
+
+  \vspace{0.05cm}
+  \begin{block}{Latency tradeoff}
+    Target fuzziness at the fields that need it; broad fuzzy matching can increase p99 even when average latency looks fine.
+  \end{block}
+\end{frame}
+
+
+
 
 \section{Migration Design}
 \subsection{Moving data without overloading PostgreSQL}
@@ -225,24 +294,13 @@
 \end{frame}
 
 \begin{frame}{Migration Design: Data Path}
-  \begin{center}
-    \begin{tabular}{c}
-      PostgreSQL source of truth \\
-      $\downarrow$ \\
-      GCP Datastream / change capture \\
-      $\downarrow$ \\
-      Append-only BigQuery replica \\
-      $\downarrow$ \\
-      Parallel indexer workers \\
-      $\downarrow$ \\
-      Elasticsearch search index
-    \end{tabular}
-  \end{center}
+  \centering
+  \vfill
+  \includegraphics[width=0.98\textwidth]{diagrams/02-target-architecture-cropped.pdf}
 
-  \vspace{0.15cm}
-  \begin{block}{Why BigQuery in the middle?}
-    It gave a time-partitioned change history for debugging consistency issues.
-  \end{block}
+  \vspace{0.25cm}
+  {\scriptsize Mermaid source: \texttt{diagrams/02-target-architecture.mmd}}
+  \vfill
 \end{frame}
 
 \begin{frame}{Migration Design: Document Identity}
@@ -324,7 +382,7 @@
     \texttt{progema}
   \end{exampleblock}
 
-  \vspace{0.25cm}
+  \vspace{0.05cm}
   \begin{center}
     \texttt{pro}, \texttt{prog}, \texttt{proge}, \texttt{progem}, \texttt{progema}
   \end{center}
@@ -340,7 +398,7 @@
     \texttt{progema}
   \end{exampleblock}
 
-  \vspace{0.25cm}
+  \vspace{0.05cm}
   \begin{center}
     \texttt{pro}, \texttt{rog}, \texttt{oge}, \texttt{gem}, \texttt{ema}
   \end{center}

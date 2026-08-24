@@ -1,0 +1,10 @@
+flowchart LR
+  user[User query] --> api[Search API]
+  api --> filters[Exact filters]
+  filters --> match[match query]
+  match --> fuzzy{fuzziness?}
+  fuzzy -->|off| bm25[BM25 scoring]
+  fuzzy -->|AUTO| expand[term expansion]
+  expand --> bm25
+  bm25 --> hits[Ranked hits]
+  expand -.more terms.-> latency[p99 latency risk]

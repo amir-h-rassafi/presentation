@@ -1,28 +1,19 @@
 flowchart LR
   pg[(PostgreSQL<br/>source of truth)]
-  ds[GCP Datastream<br/>change capture]
+  cdc[GCP Datastream<br/>CDC]
   bq[(BigQuery<br/>append-only replica)]
   idx[Indexing service<br/>parallel workers]
   es[(Elasticsearch<br/>search index)]
-  api[Search API]
-  users[Users]
 
-  pg -->|INSERT / UPDATE / DELETE| ds
-  ds -->|CDC events + metadata| bq
-  bq -->|lag-aware batches| idx
-  idx -->|bulk UPSERT / DELETE| es
-  users --> api
-  api -->|name search| es
-
-  bq -. debugging history .-> idx
-  es -. same document ID as PostgreSQL row ID .-> pg
+  pg -->|changes| cdc
+  cdc -->|events| bq
+  bq -->|batches| idx
+  idx -->|bulk writes| es
 
   classDef source fill:#EAF2F8,stroke:#1F4E79,color:#1B2631
   classDef stream fill:#E8F4F2,stroke:#2A7F78,color:#1B2631
   classDef search fill:#FDEBD0,stroke:#C56B2C,color:#1B2631
-  classDef client fill:#F4F6F7,stroke:#5D6D7E,color:#1B2631
 
   class pg,bq source
-  class ds,idx stream
+  class cdc,idx stream
   class es search
-  class api,users client
