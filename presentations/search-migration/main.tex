@@ -1,6 +1,8 @@
 \documentclass[aspectratio=169]{beamer}
 
 \input{../../common/preamble}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
 
 \title{Migrating Search}
 \subtitle{From PostgreSQL \texttt{(pg\_trgm)} to Elasticsearch \texttt{(BM25)}}
@@ -64,6 +66,31 @@
       \hyperlink{sec:outcome}{{\small\textcolor{MutedText}{Latency gains, trade-offs, and lessons}}}
   \end{enumerate}
 \end{frame}
+
+\begin{frame}{Scope: What This Is}
+  \footnotesize
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.49\textwidth}
+      {\bfseries\textcolor{SecondaryTeal}{This talk covers}}
+      \begin{itemize}
+        \item Migrating company-name search from PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25.
+        \item Data movement, indexing shape, ranking validation, and operational trade-offs.
+        \item Practical lessons for search-backed product flows.
+      \end{itemize}
+
+    \column{0.49\textwidth}
+      {\bfseries\textcolor{PrimaryBlue}{Not this talk}}
+      \begin{itemize}
+        \item Vector search or embeddings.
+        \item RAG context retrieval or answer generation.
+        \item Replacing domain judgement with automated metrics.
+      \end{itemize}
+  \end{columns}
+
+  \vspace{0.28cm}
+  {\footnotesize\textcolor{MutedText}{Still useful for future RAG or hybrid search work: data freshness, identity, ranking, and observability remain the hard parts.}}
+\end{frame}
+
 
 \section{Problem \& Goal}
 \subsection{Why and how this became an initiative}
@@ -313,48 +340,27 @@
 \end{frame}
 
 \begin{frame}{Migration Design: Indexer Shape}
-  \begin{itemize}
-    \item Indexer ran as a set of parallel workers.
-    \item Records were routed by a deterministic sharding key.
-    \item Each worker owned one shard or a stable group of shards.
-    \item Every record had a predictable path through the pipeline.
-  \end{itemize}
-
-  \vspace{0.4cm}
-  \begin{block}{Result}
-    Less coordination, fewer duplicate-processing cases, and easier investigation.
-  \end{block}
+  \centering
+  \vspace{-0.1cm}
+  \resizebox{0.93\textwidth}{!}{\input{diagrams/03-indexer-sharding.tex}}
 \end{frame}
 
 \begin{frame}{Migration Design: Timestamp Lag}
-  \begin{itemize}
-    \item BigQuery visibility can lag behind source database changes.
-    \item Large transactions and CDC apply behavior can reorder what is visible.
-    \item The indexer intentionally read from a small window in the past.
-    \item In this case, around 15 minutes of search freshness lag was acceptable.
-  \end{itemize}
-
-  \vspace{0.4cm}
-  \begin{alertblock}{Important}
-    A delay buffer reduces risk, but correctness still needs metadata, sequence ordering, and checkpoints.
-  \end{alertblock}
+  \centering
+  \vspace{-0.05cm}
+  \resizebox{0.84\textwidth}{!}{\input{diagrams/04-timestamp-lag-guardrail.tex}}
 \end{frame}
 
 \begin{frame}{Migration Design: Checkpointing}
-  \begin{center}
-    \begin{tabular}{ll}
-      1 & Read latest checkpoint from Elasticsearch \\
-      2 & Query BigQuery for newer ordered records \\
-      3 & Order by timestamp, stream sequence, and document ID \\
-      4 & Write Elasticsearch UPSERT or DELETE operations \\
-      5 & Update checkpoint only after the batch succeeds
-    \end{tabular}
-  \end{center}
+  \centering
+  \vspace{-0.05cm}
+  \resizebox{0.76\textwidth}{!}{\input{diagrams/04-checkpoint-replay-clean.tex}}
+\end{frame}
 
-  \vspace{0.5cm}
-  \begin{block}{Recovery model}
-    Reprocessing a small range is safer than checkpointing too aggressively and skipping changes.
-  \end{block}
+\begin{frame}{Migration Design: Shard State Machine}
+  \centering
+  \vspace{-0.05cm}
+  \resizebox{0.91\textwidth}{!}{\input{diagrams/04-shard-state-machine.tex}}
 \end{frame}
 
 \section{Index Design}
@@ -410,24 +416,39 @@
 \end{frame}
 
 \begin{frame}{Index Design: Word Shingles}
-  \begin{exampleblock}{Input}
-    \texttt{progema fastighets ab}
-  \end{exampleblock}
+  \footnotesize
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.47\textwidth}
+      \begin{exampleblock}{Input}
+        \texttt{progema fastighets ab}
+      \end{exampleblock}
 
-  \vspace{0.1cm}
-  \begin{center}
-    \texttt{progema}\\
-    \texttt{fastighets}\\
-    \texttt{ab}\\
-    \texttt{progema fastighets}\\
-    \texttt{fastighets ab}\\
-    \texttt{progema fastighets ab}
-  \end{center}
+      \vspace{-0.05cm}
+      \begin{center}
+        \texttt{progema}\\
+        \texttt{fastighets}\\
+        \texttt{ab}\\[0.04cm]
+        \texttt{progema fastighets}\\
+        \texttt{fastighets ab}\\
+        \texttt{progema fastighets ab}
+      \end{center}
 
-  \vspace{0.1cm}
-  \begin{block}{Use case}
-    Better ranking for longer company names and multi-token queries.
-  \end{block}
+    \column{0.49\textwidth}
+      \begin{block}{What it adds}
+        Adjacent word groups become searchable tokens.
+      \end{block}
+
+      \begin{itemize}
+        \item Preserves order and nearby-word context.
+        \item Boosts exact company-name fragments.
+        \item Separates phrase matches from loose word overlap.
+        \item Complements n-grams; not typo tolerance.
+      \end{itemize}
+
+      \begin{block}{Ranking effect}
+        \texttt{progema fastighets} prefers the full company name over a one-word overlap.
+      \end{block}
+  \end{columns}
 \end{frame}
 
 \begin{frame}{Index Design: Query Strategy}
@@ -469,16 +490,23 @@
 \end{frame}
 
 \begin{frame}{Validation: Human Judgement}
-  \begin{itemize}
-    \item Run the same query against both systems.
-    \item Ask domain experts which result looked better.
-    \item Use expert preference to validate ranking quality.
-  \end{itemize}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.42\textwidth}
+      \begin{itemize}
+        \item Run the same query against both systems.
+        \item Ask domain experts which result looked better.
+        \item Treat \texttt{both} as acceptable ranking parity.
+      \end{itemize}
 
-  \vspace{0.45cm}
-  \begin{block}{Interesting result}
-    Automated metrics showed ranking mismatch, but experts preferred the new results often enough to go live.
-  \end{block}
+      \vspace{0.25cm}
+      \begin{block}{Decision signal}
+        Elasticsearch was preferred or tied in 80\% of reviewed cases.
+      \end{block}
+
+    \column{0.54\textwidth}
+      \centering
+      \resizebox{0.95\linewidth}{!}{\input{diagrams/07-human-ranking-evaluation.tex}}
+  \end{columns}
 \end{frame}
 
 \section{Outcome}
@@ -499,6 +527,12 @@
       \bottomrule
     \end{tabular}
   \end{center}
+\end{frame}
+
+\begin{frame}{Outcome: Latency Profile}
+  \centering
+  \vspace{-0.05cm}
+  \resizebox{0.95\textwidth}{!}{\input{diagrams/08-latency-profile.tex}}
 \end{frame}
 
 \begin{frame}{Outcome: Lessons}

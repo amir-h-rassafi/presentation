@@ -1,0 +1,95 @@
+\begingroup
+\tikzset{
+  flow box/.style={
+    draw=TextInk,
+    line width=0.65pt,
+    rounded corners=4pt,
+    fill=white,
+    align=center,
+    font=\scriptsize,
+    minimum height=0.68cm
+  },
+  data box/.style={
+    flow box,
+    fill=LightBlue
+  },
+  shard box/.style={
+    flow box,
+    fill=SecondaryTeal!10,
+    minimum width=1.03cm,
+    minimum height=0.58cm
+  },
+  index box/.style={
+    flow box,
+    fill=PrimaryBlue!6
+  },
+  step num/.style={
+    font=\scriptsize\bfseries,
+    text=SecondaryTeal,
+    align=center
+  },
+  green note/.style={
+    font=\tiny,
+    text=SecondaryTeal,
+    align=center
+  },
+  arrow/.style={
+    -{Latex[length=2.0mm,width=1.45mm]},
+    line width=0.55pt,
+    draw=TextInk
+  },
+  loop arrow/.style={
+    -{Latex[length=2.0mm,width=1.45mm]},
+    line width=0.55pt,
+    draw=TextInk,
+    rounded corners=5pt
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \node[data box, minimum width=1.80cm] (checkpoint) at (0.95,4.35) {Elasticsearch\\checkpoint};
+  \node[flow box, minimum width=1.95cm] (read) at (3.15,4.35) {Read checkpoint};
+  \node[data box, minimum width=1.80cm] (bq) at (5.35,4.35) {BigQuery\\{\color{SecondaryTeal}new rows}};
+
+  \node[step num] at (0.95,4.95) {1};
+  \node[step num] at (3.15,4.95) {2};
+  \node[step num] at (5.35,4.95) {3};
+
+  \draw[arrow] (checkpoint.east) -- (read.west);
+  \draw[arrow] (read.east) -- (bq.west);
+
+  \coordinate (fanout) at (5.35,3.02);
+  \draw[TextInk,line width=0.55pt] (bq.south) -- (fanout);
+  \draw[TextInk,line width=0.55pt] (3.45,3.02) -- (7.60,3.02);
+  \node[green note, anchor=west] at (5.86,3.45) {parallel write};
+  \node[step num] at (3.35,3.02) {4};
+
+  \node[shard box] (s1) at (3.45,2.30) {Shard 1};
+  \node[shard box] (s2) at (5.02,2.30) {Shard 2};
+  \node[green note, text=TextInk] at (6.05,2.32) {$\cdots$};
+  \node[shard box] (sn) at (7.34,2.30) {Shard $N$};
+
+  \draw[arrow] (3.45,3.02) -- (s1.north);
+  \draw[arrow] (5.02,3.02) -- (s2.north);
+  \draw[arrow] (7.34,3.02) -- (sn.north);
+
+  \node[index box, minimum width=4.15cm, minimum height=0.84cm] (dataIndex) at (5.50,1.38) {Elasticsearch\\data index};
+  \node[step num, anchor=west] at (7.50,1.50) {5};
+
+  \draw[arrow] (s1.south) -- (s1.south |- dataIndex.north);
+  \draw[arrow] (s2.south) -- (s2.south |- dataIndex.north);
+  \draw[arrow] (sn.south) -- (sn.south |- dataIndex.north);
+
+  \node[flow box, minimum width=3.10cm] (update) at (5.50,0.27) {Update checkpoint};
+  \node[green note] at (5.50,-0.37) {lsn + doc\_id + time};
+  \draw[arrow] (dataIndex.south) -- (update.north);
+
+  \draw[loop arrow] (update.west) -- ++(-4.05,0) |- (checkpoint.west);
+\end{tikzpicture}
+\endgroup

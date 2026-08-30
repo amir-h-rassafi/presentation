@@ -1,0 +1,56 @@
+\begingroup
+\tikzset{
+  chart label/.style={
+    font=\scriptsize,
+    text=TextInk,
+    align=left
+  },
+  pct label/.style={
+    font=\tiny,
+    text=MutedText,
+    align=left
+  },
+  leader/.style={
+    draw=MutedText,
+    line width=0.45pt
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \definecolor{ChartBlue}{HTML}{4285F4}
+  \definecolor{ChartRed}{HTML}{EA4335}
+  \definecolor{ChartYellow}{HTML}{FBBC05}
+
+  \coordinate (c) at (0,0);
+  \def\r{1.45}
+
+  \fill[ChartBlue] (c) -- (90:\r) arc[start angle=90,end angle=-92.16,radius=\r] -- cycle;
+  \fill[ChartRed] (c) -- (-92.16:\r) arc[start angle=-92.16,end angle=-164.16,radius=\r] -- cycle;
+  \fill[ChartYellow] (c) -- (-164.16:\r) arc[start angle=-164.16,end angle=-270,radius=\r] -- cycle;
+
+  \draw[white,line width=0.45pt] (c) -- (90:\r);
+  \draw[white,line width=0.45pt] (c) -- (-92.16:\r);
+  \draw[white,line width=0.45pt] (c) -- (-164.16:\r);
+
+  \fill[MutedText] (3:1.28) circle (0.025);
+  \draw[leader] (3:1.28) -- (2.35,0.08);
+  \node[chart label, anchor=west] at (2.38,0.15) {Elasticsearch};
+  \node[pct label, anchor=west] at (2.38,-0.08) {50.6\%};
+
+  \fill[MutedText] (156:1.24) circle (0.025);
+  \draw[leader] (156:1.24) -- (-2.25,0.74);
+  \node[chart label, anchor=east] at (-2.28,0.83) {Both};
+  \node[pct label, anchor=east] at (-2.28,0.60) {29.4\%};
+
+  \fill[MutedText] (235:1.12) circle (0.025);
+  \draw[leader] (235:1.12) -- (-2.25,-1.05);
+  \node[chart label, anchor=east] at (-2.28,-0.96) {PostgreSQL};
+  \node[pct label, anchor=east] at (-2.28,-1.19) {20.0\%};
+\end{tikzpicture}
+\endgroup

@@ -1,0 +1,202 @@
+\begingroup
+\tikzset{
+  pipeline box/.style={
+    draw=TextInk,
+    line width=0.55pt,
+    rounded corners=3pt,
+    fill=white,
+    align=center,
+    font=\tiny
+  },
+  hop box/.style={
+    draw=TextInk,
+    line width=0.7pt,
+    rounded corners=5pt,
+    fill=white,
+    font=\tiny
+  },
+  routing box/.style={
+    pipeline box,
+    fill=PrimaryBlue!7,
+    text width=4.15cm,
+    minimum height=0.78cm
+  },
+  shard box/.style={
+    pipeline box,
+    fill=SecondaryTeal!17,
+    minimum width=1.08cm,
+    minimum height=0.53cm
+  },
+  worker box/.style={
+    pipeline box,
+    fill=LightBlue,
+    minimum width=1.18cm,
+    minimum height=0.65cm
+  },
+  journey box/.style={
+    draw=PrimaryBlue!80,
+    line width=0.65pt,
+    rounded corners=3pt,
+    fill=white,
+    text=PrimaryBlue!85,
+    align=center,
+    font=\tiny,
+    minimum width=1.42cm,
+    minimum height=0.5cm
+  },
+  label text/.style={
+    align=center,
+    text=TextInk,
+    font=\tiny
+  },
+  side arrow/.style={
+    -{Latex[length=1.25mm,width=0.95mm]},
+    line width=0.5pt,
+    draw=TextInk
+  },
+  small note/.style={
+    align=center,
+    text=TextInk,
+    font=\tiny
+  },
+  main arrow/.style={
+    -{Latex[length=2.1mm,width=1.6mm]},
+    line width=0.55pt,
+    draw=TextInk
+  },
+  dashed arrow/.style={
+    -{Latex[length=1.8mm,width=1.35mm]},
+    dashed,
+    line width=0.45pt,
+    draw=TextInk
+  },
+  journey arrow/.style={
+    -{Latex[length=1.9mm,width=1.35mm]},
+    dashed,
+    line width=0.55pt,
+    draw=PrimaryBlue!80
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily\tiny
+]
+  \definecolor{PostgresBlue}{HTML}{336791}
+  \definecolor{BigQueryBlue}{HTML}{4285F4}
+  \definecolor{BigQueryDark}{HTML}{3367D6}
+  \definecolor{ElasticYellow}{HTML}{FEC514}
+  \definecolor{ElasticTeal}{HTML}{00BFB3}
+  \definecolor{ElasticInk}{HTML}{343741}
+
+  \newcommand{\PostgresMark}[1]{%
+    \begin{scope}[scale=#1]
+      \draw[fill=PostgresBlue,draw=PostgresBlue!70!black,line width=0.35pt]
+        (-0.43,0.2) .. controls (-0.5,0.68) and (-0.14,0.82) .. (0.08,0.62)
+        .. controls (0.3,0.82) and (0.67,0.68) .. (0.58,0.18)
+        .. controls (0.52,-0.2) and (0.32,-0.43) .. (0.05,-0.5)
+        .. controls (-0.22,-0.43) and (-0.37,-0.2) .. (-0.43,0.2) -- cycle;
+      \draw[white,line width=1.25pt]
+        (-0.19,0.42) .. controls (-0.06,0.52) and (0.15,0.49) .. (0.18,0.24)
+        .. controls (0.23,-0.18) and (0.02,-0.22) .. (0.02,-0.47);
+      \draw[white,line width=1.05pt]
+        (-0.33,0.35) .. controls (-0.12,0.57) and (0.17,0.47) .. (0.33,0.29);
+      \draw[white,line width=0.75pt] (-0.22,0.15) circle (0.035);
+      \draw[white,line width=0.75pt] (0.29,0.15) circle (0.035);
+    \end{scope}%
+  }
+
+  \newcommand{\BigQueryMark}[1]{%
+    \begin{scope}[scale=#1]
+      \path[fill=BigQueryBlue]
+        (0,0.58) -- (0.51,0.29) -- (0.51,-0.29) -- (0,-0.58)
+        -- (-0.51,-0.29) -- (-0.51,0.29) -- cycle;
+      \path[fill=BigQueryDark,opacity=0.34]
+        (0.51,0.29) -- (0.51,-0.29) -- (0,-0.58) -- (0,-0.15) -- cycle;
+      \draw[white,line width=0.8pt] (0,0) circle (0.23);
+      \draw[white,line width=0.65pt] (-0.11,-0.1) -- (-0.11,0.07);
+      \draw[white,line width=0.65pt] (0,-0.1) -- (0,0.16);
+      \draw[white,line width=0.65pt] (0.11,-0.1) -- (0.11,-0.01);
+    \end{scope}%
+  }
+
+  \newcommand{\ElasticMark}[1]{%
+    \begin{scope}[scale=#1]
+      \path[fill=ElasticYellow]
+        (-0.48,0.18) .. controls (-0.34,0.48) and (0.1,0.56) .. (0.42,0.32)
+        .. controls (0.48,0.27) and (0.43,0.18) .. (0.34,0.18) -- cycle;
+      \path[fill=ElasticInk]
+        (-0.52,0.05) -- (0.36,0.05)
+        .. controls (0.5,0.05) and (0.5,-0.16) .. (0.36,-0.16)
+        -- (-0.52,-0.16) .. controls (-0.57,-0.09) and (-0.57,-0.02) .. (-0.52,0.05) -- cycle;
+      \path[fill=ElasticTeal]
+        (-0.48,-0.29) -- (0.34,-0.29)
+        .. controls (0.43,-0.29) and (0.48,-0.38) .. (0.42,-0.43)
+        .. controls (0.11,-0.66) and (-0.34,-0.59) .. (-0.48,-0.29) -- cycle;
+    \end{scope}%
+  }
+
+  \node[pipeline box, minimum width=1.50cm, minimum height=2.10cm] (pg) at (0.42,4.25) {};
+  \begin{scope}[shift={($(pg.north)+(0,-0.42)$)}]\PostgresMark{0.46}\end{scope}
+  \node[label text, text width=1.34cm] at ($(pg.center)+(0,-0.22)$) {PostgreSQL};
+  \node[small note, text width=1.34cm, anchor=north] at ($(pg.center)+(0,-0.45)$) {(Source\\of truth)};
+
+  \node[pipeline box, minimum width=1.80cm, minimum height=2.10cm] (bq) at (2.35,4.25) {};
+  \begin{scope}[shift={($(bq.north)+(0,-0.44)$)}]\BigQueryMark{0.48}\end{scope}
+  \node[label text, text width=1.64cm] at ($(bq.center)+(0,-0.22)$) {BigQuery};
+  \node[small note, font=\fontsize{3.7pt}{4.1pt}\selectfont, text width=1.58cm, anchor=north] at ($(bq.center)+(0,-0.45)$) {(Append-only\\replica via\\Datastream)};
+
+  \node[hop box, minimum width=6.65cm, minimum height=3.85cm] (hop) at (6.82,4.24) {};
+  \node[label text, font=\tiny\bfseries] at ($(hop.north)+(0,-0.3)$) {Indexer hop (Sharded workers)};
+
+  \node[routing box] (router) at (6.65,4.98) {Routing by sharding key\\[0.08cm]\texttt{hash(entity\_unique\_id) \% N}};
+
+  \node[shard box] (s0) at (4.38,3.83) {Shard 0};
+  \node[shard box] (s1) at (5.67,3.83) {Shard 1};
+  \node[shard box] (s2) at (6.96,3.83) {Shard 2};
+  \node[label text] at (7.85,3.84) {$\cdots$};
+  \node[shard box] (sn) at (9.13,3.83) {Shard $N-1$};
+
+  \node[worker box] (w0) at (4.38,2.83) {Worker A\\(Shard 0)};
+  \node[worker box] (w1) at (5.67,2.83) {Worker B\\(Shard 1)};
+  \node[worker box] (w2) at (6.96,2.83) {Worker C\\(Shard 2)};
+  \node[worker box] (wn) at (9.13,2.83) {Worker N\\(Shard $N-1$)};
+
+  \draw[side arrow] ([xshift=0.04cm]pg.east) -- ([xshift=-0.04cm]bq.west);
+  \draw[side arrow] ([xshift=0.04cm]bq.east) -- ([xshift=-0.04cm]hop.west);
+  \draw[side arrow] ([xshift=0.04cm]hop.east) -- (10.95,4.25);
+  \draw[main arrow] (router.south west) -- (s0.north);
+  \draw[main arrow] ($(router.south west)!0.37!(router.south east)$) -- (s1.north);
+  \draw[main arrow] ($(router.south west)!0.61!(router.south east)$) -- (s2.north);
+  \draw[main arrow] ($(router.south west)!0.84!(router.south east)$) -- (sn.north);
+  \draw[dashed arrow] (s0.south) -- (w0.north);
+  \draw[dashed arrow] (s1.south) -- (w1.north);
+  \draw[dashed arrow] (s2.south) -- (w2.north);
+  \draw[dashed arrow] (sn.south) -- (wn.north);
+
+  \node[pipeline box, minimum width=1.72cm, minimum height=2.10cm] (es) at (11.85,4.25) {};
+  \begin{scope}[shift={($(es.north)+(0,-0.49)$)}]\ElasticMark{0.52}\end{scope}
+  \node[label text, text width=1.55cm] at ($(es.center)+(0,-0.22)$) {Elasticsearch};
+  \node[small note, text width=1.45cm, anchor=north] at ($(es.center)+(0,-0.45)$) {(Search index)};
+
+  \node[journey box] (record) at (1.25,1.0) {Record X};
+  \node[journey box, minimum width=2.15cm] (entity) at (3.56,1.0) {\texttt{entity\_unique\_id}};
+  \node[journey box] (shard) at (5.86,1.0) {Shard k};
+  \node[journey box] (worker) at (8.15,1.0) {Worker k};
+  \node[journey box, minimum width=1.62cm] (elastic) at (10.43,1.0) {Elasticsearch};
+
+  \draw[journey arrow] (record.east) -- (entity.west);
+  \draw[journey arrow] (entity.east) -- (shard.west);
+  \draw[journey arrow] (shard.east) -- (worker.west);
+  \draw[journey arrow] (worker.east) -- (elastic.west);
+
+  \node[small note] at ($(record.south)+(0,-0.46)$) {New or changed\\record in PostgreSQL};
+  \node[small note] at ($(entity.south)+(0,-0.46)$) {Deterministic routing\\by sharding key};
+  \node[small note] at ($(shard.south)+(0,-0.51)$) {Record is assigned\\to a specific shard\\(k = hash(id) \% N)};
+  \node[small note] at ($(worker.south)+(0,-0.51)$) {The worker responsible\\for that shard\\processes the record};
+  \node[small note] at ($(elastic.south)+(0,-0.51)$) {Document is indexed\\and becomes\\searchable};
+\end{tikzpicture}
+\endgroup

@@ -1,0 +1,92 @@
+\begingroup
+\tikzset{
+  state box/.style={
+    draw=TextInk,
+    line width=0.65pt,
+    rounded corners=4pt,
+    fill=white,
+    align=center,
+    font=\scriptsize,
+    minimum width=2.05cm,
+    minimum height=0.75cm
+  },
+  shard state/.style={
+    state box,
+    fill=SecondaryTeal!10,
+    minimum width=1.75cm
+  },
+  note box/.style={
+    draw=PrimaryBlue!70,
+    line width=0.55pt,
+    rounded corners=4pt,
+    fill=PrimaryBlue!4,
+    align=left,
+    font=\tiny,
+    text width=3.35cm,
+    inner sep=5pt
+  },
+  tiny note/.style={
+    font=\tiny,
+    text=TextInk,
+    align=center
+  },
+  green note/.style={
+    font=\tiny\bfseries,
+    text=SecondaryTeal,
+    align=center
+  },
+  arrow/.style={
+    -{Latex[length=2.0mm,width=1.45mm]},
+    line width=0.55pt,
+    draw=TextInk
+  },
+  dashed arrow/.style={
+    -{Latex[length=1.8mm,width=1.35mm]},
+    dashed,
+    line width=0.55pt,
+    draw=PrimaryBlue!75
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \node[state box] (read) at (0.0,3.15) {Read\\checkpoint};
+  \node[state box] (claim) at (2.55,3.15) {Claim\\shard};
+  \node[state box] (fetch) at (5.10,3.15) {Fetch ordered\\BigQuery rows};
+  \node[state box] (write) at (7.75,3.15) {Bulk write\\Elasticsearch};
+  \node[state box] (commit) at (10.25,3.15) {Commit\\checkpoint};
+
+  \draw[arrow] (read.east) -- (claim.west);
+  \draw[arrow] (claim.east) -- (fetch.west);
+  \draw[arrow] (fetch.east) -- (write.west);
+  \draw[arrow] (write.east) -- (commit.west);
+
+  \draw[dashed arrow] (commit.south) -- ++(0,-0.62) -- ++(-10.25,0) -- (read.south);
+
+  \node[tiny note] at (2.55,2.18) {\texttt{hash(entity\_unique\_id) \% N}};
+
+  \node[shard state] (s0) at (1.25,1.25) {Shard 0\\unique IDs};
+  \node[shard state] (s1) at (3.55,1.25) {Shard 1\\unique IDs};
+  \node[tiny note] at (5.38,1.26) {$\cdots$};
+  \node[shard state] (sn) at (7.15,1.25) {Shard $N-1$\\unique IDs};
+
+  \coordinate (shardBus) at (2.55,1.92);
+  \draw[TextInk,line width=0.55pt] (claim.south) -- (shardBus);
+  \draw[TextInk,line width=0.55pt] (s0.north |- shardBus) -- (sn.north |- shardBus);
+  \draw[arrow] (s0.north |- shardBus) -- (s0.north);
+  \draw[arrow] (s1.north |- shardBus) -- (s1.north);
+  \draw[arrow] (sn.north |- shardBus) -- (sn.north);
+
+  \node[note box] at (10.15,1.22) {
+    Sharding helps because each worker owns a disjoint key range.\\[0.08cm]
+    The same entity always maps to the same shard, so retries are idempotent and duplicate writes are easier to reason about.
+  };
+
+  \node[green note] at (4.25,0.30) {No shard overlap: a document belongs to exactly one worker path.};
+\end{tikzpicture}
+\endgroup
