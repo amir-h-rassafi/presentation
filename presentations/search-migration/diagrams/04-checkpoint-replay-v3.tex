@@ -1,0 +1,131 @@
+\begingroup
+\tikzset{
+  node box/.style={
+    draw=TextInk,
+    line width=0.55pt,
+    rounded corners=3pt,
+    fill=white,
+    align=center,
+    font=\tiny,
+    minimum height=0.58cm,
+    inner xsep=5pt,
+    inner ysep=3pt
+  },
+  store box/.style={
+    node box,
+    fill=LightBlue
+  },
+  partition box/.style={
+    node box,
+    fill=PrimaryBlue!6,
+    minimum width=2.40cm
+  },
+  shard box/.style={
+    node box,
+    fill=SecondaryTeal!10,
+    minimum width=1.12cm
+  },
+  control bar/.style={
+    node box,
+    fill=WarmAccent!9,
+    minimum width=6.25cm,
+    minimum height=0.62cm
+  },
+  index bar/.style={
+    node box,
+    fill=PrimaryBlue!5,
+    minimum width=6.25cm,
+    minimum height=0.62cm
+  },
+  step num/.style={
+    font=\scriptsize\bfseries,
+    text=SecondaryTeal,
+    align=center
+  },
+  note/.style={
+    font=\tiny,
+    text=SecondaryTeal,
+    align=left
+  },
+  muted note/.style={
+    font=\tiny,
+    text=MutedText,
+    align=center
+  },
+  arrow/.style={
+    -{Latex[length=1.45mm,width=1.0mm]},
+    line width=0.45pt,
+    draw=TextInk
+  },
+  guide/.style={
+    line width=0.42pt,
+    draw=TextInk
+  },
+  feedback/.style={
+    -{Latex[length=1.25mm,width=0.9mm]},
+    line width=0.42pt,
+    draw=MutedText,
+    dashed,
+    rounded corners=5pt
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \node[store box, minimum width=1.70cm] (checkpoint) at (1.00,4.20) {Elasticsearch\\checkpoint};
+  \node[node box, minimum width=1.60cm] (read) at (3.05,4.20) {Read\\checkpoint};
+  \node[store box, minimum width=1.55cm] (bq) at (5.02,4.20) {BigQuery\\new rows};
+  \node[partition box] (partition) at (7.45,4.20) {Partition by sharding key\\\texttt{hash(id) \% N}};
+
+  \node[step num] at (1.00,4.83) {1};
+  \node[step num] at (3.05,4.83) {2};
+  \node[step num] at (5.02,4.83) {3};
+  \node[step num] at (7.45,4.83) {4};
+
+  \draw[arrow] (checkpoint.east) -- (read.west);
+  \draw[arrow] (read.east) -- (bq.west);
+  \draw[arrow] (bq.east) -- (partition.west);
+
+  \coordinate (bus) at (7.45,3.20);
+  \draw[guide] (partition.south) -- (bus);
+  \draw[guide] (3.45,3.20) -- (9.80,3.20);
+  \node[note, anchor=west] at (7.88,3.42) {parallel writes};
+
+  \node[shard box] (s1) at (3.45,2.58) {Shard 1};
+  \node[shard box] (s2) at (5.35,2.58) {Shard 2};
+  \node[muted note] at (6.85,2.60) {$\cdots$};
+  \node[shard box] (sn) at (8.90,2.58) {Shard $N$};
+
+  \draw[arrow] (3.45,3.20) -- (s1.north);
+  \draw[arrow] (5.35,3.20) -- (s2.north);
+  \draw[arrow] (8.90,3.20) -- (sn.north);
+
+  \node[control bar] (throttle) at (6.18,1.70) {Optional throttler: batch size + RPS cap};
+  \draw[arrow] (s1.south) -- (s1.south |- throttle.north);
+  \draw[arrow] (s2.south) -- (s2.south |- throttle.north);
+  \draw[arrow] (sn.south) -- (sn.south |- throttle.north);
+
+  \node[index bar] (index) at (6.18,0.88) {Elasticsearch data index};
+  \draw[arrow] (throttle.south) -- (index.north);
+
+  \node[node box, minimum width=2.65cm] (commit) at (6.18,0.03) {Update checkpoint};
+  \node[step num, anchor=west] at ($(commit.east)+(0.18,0)$) {5};
+  \node[note, align=center] at (6.18,-0.54) {lsn + doc\_id + time};
+  \draw[arrow] (index.south) -- (commit.north);
+
+  \node[note, text width=2.55cm, anchor=west] at (9.65,1.05) {
+    \texttt{refresh\_interval}\\
+    \texttt{30s -> 300s}\\
+    reduces refresh pressure\\
+    improves bulk throughput
+  };
+
+  \draw[feedback] (commit.west) -- (0.25,0.03) -- (0.25,4.20) -- (checkpoint.west);
+  \node[muted note, anchor=west] at (0.38,2.02) {next batch};
+\end{tikzpicture}
+\endgroup

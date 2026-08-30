@@ -67,28 +67,32 @@
   \end{enumerate}
 \end{frame}
 
-\begin{frame}{Scope: What This Is}
+\section*{Scope}
+
+\begin{frame}{Scope: Boundaries}
   \footnotesize
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.49\textwidth}
-      {\bfseries\textcolor{SecondaryTeal}{This talk covers}}
-      \begin{itemize}
-        \item Migrating company-name search from PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25.
-        \item Data movement, indexing shape, ranking validation, and operational trade-offs.
-        \item Practical lessons for search-backed product flows.
-      \end{itemize}
+    \column{0.48\textwidth}
+      \begin{block}{What this is about}
+        \begin{itemize}
+          \item PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25.
+          \item CDC-backed data movement and indexer shape.
+          \item Ranking validation and production trade-offs.
+        \end{itemize}
+      \end{block}
 
-    \column{0.49\textwidth}
-      {\bfseries\textcolor{PrimaryBlue}{Not this talk}}
-      \begin{itemize}
-        \item Vector search or embeddings.
-        \item RAG context retrieval or answer generation.
-        \item Replacing domain judgement with automated metrics.
-      \end{itemize}
+    \column{0.48\textwidth}
+      \begin{alertblock}{What this is not about}
+        \begin{itemize}
+          \item Vector search or embeddings.
+          \item RAG context matching or answer generation.
+          \item Replacing expert judgement with metrics.
+        \end{itemize}
+      \end{alertblock}
   \end{columns}
 
-  \vspace{0.28cm}
-  {\footnotesize\textcolor{MutedText}{Still useful for future RAG or hybrid search work: data freshness, identity, ranking, and observability remain the hard parts.}}
+  \vspace{0.18cm}
+  {\scriptsize\textcolor{MutedText}{The same foundations still matter for RAG and hybrid search: freshness, identity, ranking, and observability.}}
 \end{frame}
 
 
@@ -99,7 +103,7 @@
   \hypertarget{sec:problem}{}
   \begin{itemize}
     \item The current search worked and users trusted its fuzzy matching behavior.
-    \item It ran on PostgreSQL with 16 CPU cores and 64 GB memory.
+    \item It ran on PostgreSQL with \textbf{16 CPU} cores and \textbf{64 GB} memory.
     \item At around 10M records, p99 latency was about 10 seconds.
     \item Maximum sustainable throughput was around 2 requests per second.
   \end{itemize}
@@ -354,13 +358,13 @@
 \begin{frame}{Migration Design: Checkpointing}
   \centering
   \vspace{-0.05cm}
-  \resizebox{0.76\textwidth}{!}{\input{diagrams/04-checkpoint-replay-clean.tex}}
+  \resizebox{0.90\textwidth}{!}{\input{diagrams/04-checkpoint-replay-v3.tex}}
 \end{frame}
 
 \begin{frame}{Migration Design: Shard State Machine}
   \centering
   \vspace{-0.05cm}
-  \resizebox{0.91\textwidth}{!}{\input{diagrams/04-shard-state-machine.tex}}
+  \resizebox{0.92\textwidth}{!}{\input{diagrams/04-shard-state-machine-v3.tex}}
 \end{frame}
 
 \section{Index Design}
@@ -381,6 +385,30 @@
       \bottomrule
     \end{tabular}
   \end{center}
+\end{frame}
+
+\begin{frame}{Index Design: Analyzer Choices}
+  \footnotesize
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.47\textwidth}
+      \begin{exampleblock}{Same text, different terms}
+        \texttt{acme-fastighets.ab}\\[0.16cm]
+        \textbf{standard-like:} \texttt{acme}, \texttt{fastighets}, \texttt{ab}\\
+        \textbf{whitespace-like:} \texttt{acme-fastighets.ab}
+      \end{exampleblock}
+
+      \begin{block}{Why it matters}
+        A tokenizer decides which tokens exist. If it splits on \texttt{-}, \texttt{.}, or space differently, recall and ranking change.
+      \end{block}
+
+    \column{0.49\textwidth}
+      \begin{itemize}
+        \item Standard analyzers are good defaults, but punctuation and identifiers need tests.
+        \item Index analyzer and query analyzer must be intentionally compatible.
+        \item Use \texttt{\_analyze} on real names: hyphens, dots, suffixes, casing, OCR noise.
+        \item Add a dedicated field when one tokenization cannot serve all query shapes.
+      \end{itemize}
+  \end{columns}
 \end{frame}
 
 \begin{frame}{Index Design: Prefix Matching}
@@ -451,13 +479,50 @@
   \end{columns}
 \end{frame}
 
+\begin{frame}{Index Design: Size And Query Cost}
+  \footnotesize
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{tabular}{ll}
+        \toprule
+        Field view & Cost shape \\
+        \midrule
+        Exact keyword & Small \\
+        Prefix & Medium \\
+        Character n-gram & High postings count \\
+        Word shingle & More phrase terms \\
+        Reordered name field & Extra full field \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.24cm}
+      \begin{block}{Estimate before full rollout}
+        Index a 1M-row sample, inspect \texttt{\_disk\_usage}, term counts from \texttt{\_analyze}, and query profiles. Multiply by expected corpus size with replica count included.
+      \end{block}
+
+    \column{0.48\textwidth}
+      \begin{block}{How it helps performance}
+        Precomputed fields move work from query time to indexing time.
+      \end{block}
+
+      \begin{itemize}
+        \item Prefix fields avoid expensive broad fuzzy-prefix queries.
+        \item N-grams recover typo tolerance without scanning every candidate.
+        \item Shingles boost ordered fragments with fewer phrase-query surprises.
+        \item Exact/normalized fields give cheap high-confidence boosts.
+        \item Keep min/max grams tight and drop fields that do not move ranking metrics.
+      \end{itemize}
+  \end{columns}
+\end{frame}
+
 \begin{frame}{Index Design: Query Strategy}
   \begin{itemize}
     \item Combine several name signals at query time.
     \item Boost exact and normalized matches.
     \item Use prefix fields for partial input.
     \item Use n-gram fields for misspellings and fuzzy fragments.
-    \item Use shingles to preserve multi-word context.
+    \item Use shingles to preserve ordered multi-word context.
+    \item Query reordered name fields for last-first / first-last variants.
   \end{itemize}
 
   \vspace{0.45cm}

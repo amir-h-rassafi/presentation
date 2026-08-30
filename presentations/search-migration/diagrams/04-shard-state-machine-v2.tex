@@ -1,0 +1,100 @@
+\begingroup
+\tikzset{
+  state box/.style={
+    draw=TextInk,
+    line width=0.6pt,
+    rounded corners=4pt,
+    fill=white,
+    align=center,
+    font=\tiny,
+    minimum width=1.58cm,
+    minimum height=0.62cm,
+    inner xsep=5pt,
+    inner ysep=4pt
+  },
+  active state/.style={
+    state box,
+    fill=LightBlue
+  },
+  shard box/.style={
+    state box,
+    fill=SecondaryTeal!10,
+    minimum width=1.45cm
+  },
+  note box/.style={
+    draw=PrimaryBlue!70,
+    line width=0.55pt,
+    rounded corners=4pt,
+    fill=PrimaryBlue!4,
+    align=center,
+    font=\tiny,
+    text width=7.60cm,
+    inner sep=5pt
+  },
+  note/.style={
+    font=\tiny,
+    text=SecondaryTeal,
+    align=center
+  },
+  muted note/.style={
+    font=\tiny,
+    text=MutedText,
+    align=center
+  },
+  arrow/.style={
+    -{Latex[length=1.65mm,width=1.15mm]},
+    line width=0.5pt,
+    draw=TextInk
+  },
+  loop arrow/.style={
+    -{Latex[length=1.45mm,width=1.05mm]},
+    line width=0.45pt,
+    draw=MutedText,
+    dashed,
+    rounded corners=5pt
+  },
+  guide/.style={
+    line width=0.45pt,
+    draw=TextInk
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \node[active state] (own) at (0.70,3.75) {Own\\shard $k$};
+  \node[state box] (read) at (2.70,3.75) {Read shard\\checkpoint};
+  \node[state box, minimum width=1.90cm] (fetch) at (5.00,3.75) {Fetch ordered\\rows};
+  \node[state box] (write) at (7.25,3.75) {Bulk write\\(throttled)};
+  \node[active state] (commit) at (9.35,3.75) {Commit shard\\checkpoint};
+
+  \draw[arrow] (own.east) -- (read.west);
+  \draw[arrow] (read.east) -- (fetch.west);
+  \draw[arrow] (fetch.east) -- (write.west);
+  \draw[arrow] (write.east) -- (commit.west);
+  \draw[loop arrow] (commit.south) -- ++(0,-0.55) -- ++(-8.65,0) -- (own.south);
+
+  \node[note] at (5.00,2.78) {\texttt{shard = hash(entity\_unique\_id) \% N}};
+
+  \coordinate (bus) at (5.00,2.20);
+  \draw[guide] (2.00,2.20) -- (8.00,2.20);
+
+  \node[shard box] (s0) at (2.00,1.55) {Shard 0\\unique IDs};
+  \node[shard box] (s1) at (4.00,1.55) {Shard 1\\unique IDs};
+  \node[muted note] at (5.50,1.58) {$\cdots$};
+  \node[shard box] (sn) at (7.15,1.55) {Shard $N-1$\\unique IDs};
+
+  \draw[arrow] (2.00,2.20) -- (s0.north);
+  \draw[arrow] (4.00,2.20) -- (s1.north);
+  \draw[arrow] (7.15,2.20) -- (sn.north);
+
+  \node[note box] at (5.10,0.48) {
+    Sharding helps because workers never fight for the same entity. Each record has one owner path, so retry behavior stays idempotent.\\[0.06cm]
+    No overlap: one entity ID belongs to exactly one shard.
+  };
+\end{tikzpicture}
+\endgroup
