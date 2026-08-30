@@ -5,6 +5,7 @@ Diagram sources for the presentation and article:
 - `01-before-bottleneck.mmd` - PostgreSQL `pg_trgm` search bottleneck.
 - `02-target-architecture.mmd` - PostgreSQL to BigQuery to Elasticsearch path.
 - `03-indexer-sharding.tex` - vector chart for deterministic worker routing by shard key.
+- `04-elasticsearch-cluster-shards.tex` - vector chart for Elasticsearch production shard and replica placement.
 - `03-indexer-sharding.mmd` - Mermaid source for the simpler sharding diagram.
 - `04-timestamp-lag-guardrail.tex` - vector chart for timestamp-lag guardrail behavior.
 - `04-checkpoint-replay-v3.tex` - current clean vector chart for replayable checkpoint, throttling, and sharded writes.

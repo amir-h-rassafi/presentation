@@ -1,0 +1,128 @@
+\begingroup
+\tikzset{
+  node box/.style={
+    draw=TextInk,
+    line width=0.55pt,
+    rounded corners=3pt,
+    fill=white,
+    align=center,
+    font=\tiny,
+    minimum width=2.05cm,
+    minimum height=1.25cm,
+    inner xsep=5pt,
+    inner ysep=5pt
+  },
+  shard pill/.style={
+    draw=TextInk,
+    line width=0.45pt,
+    rounded corners=3pt,
+    align=center,
+    font=\fontsize{5.7pt}{6.2pt}\selectfont,
+    minimum width=0.78cm,
+    minimum height=0.34cm,
+    inner xsep=3pt,
+    inner ysep=1pt
+  },
+  primary shard/.style={
+    shard pill,
+    fill=SecondaryTeal!18
+  },
+  replica shard/.style={
+    shard pill,
+    fill=PrimaryBlue!10
+  },
+  setting box/.style={
+    draw=PrimaryBlue!75,
+    line width=0.55pt,
+    rounded corners=3pt,
+    fill=PrimaryBlue!5,
+    align=center,
+    font=\tiny,
+    text width=2.65cm,
+    inner sep=5pt
+  },
+  note box/.style={
+    draw=WarmAccent!80,
+    line width=0.55pt,
+    rounded corners=3pt,
+    fill=WarmAccent!10,
+    align=left,
+    font=\tiny,
+    text width=3.20cm,
+    inner sep=5pt
+  },
+  small note/.style={
+    font=\tiny,
+    text=MutedText,
+    align=center
+  },
+  teal note/.style={
+    font=\tiny,
+    text=SecondaryTeal,
+    align=center
+  },
+  arrow/.style={
+    -{Latex[length=1.45mm,width=1.0mm]},
+    line width=0.45pt,
+    draw=TextInk
+  },
+  guide/.style={
+    line width=0.42pt,
+    draw=MutedText,
+    dashed
+  }
+}
+
+\begin{tikzpicture}[
+  x=1cm,
+  y=1cm,
+  line cap=round,
+  line join=round,
+  font=\sffamily
+]
+  \node[setting box] (settings) at (1.40,3.75) {
+    Production index settings\\[0.04cm]
+    \texttt{number\_of\_shards: 3}\\
+    \texttt{number\_of\_replicas: 1}
+  };
+
+  \node[setting box, text width=2.82cm] (routing) at (4.65,3.75) {
+    Elasticsearch routing\\[0.04cm]
+    \texttt{hash(\_routing) \% primary\_shards}\\
+    picks one primary shard
+  };
+
+  \draw[arrow] (settings.east) -- (routing.west);
+
+  \node[node box] (n1) at (2.30,1.88) {Data node 1};
+  \node[node box] (n2) at (5.20,1.88) {Data node 2};
+  \node[node box] (n3) at (8.10,1.88) {Data node 3};
+
+  \node[primary shard] at ($(n1.center)+(-0.42,0.10)$) {P0};
+  \node[replica shard] at ($(n1.center)+(0.50,0.10)$) {R2};
+  \node[primary shard] at ($(n2.center)+(-0.42,0.10)$) {P1};
+  \node[replica shard] at ($(n2.center)+(0.50,0.10)$) {R0};
+  \node[primary shard] at ($(n3.center)+(-0.42,0.10)$) {P2};
+  \node[replica shard] at ($(n3.center)+(0.50,0.10)$) {R1};
+
+  \node[small note] at ($(n1.south)+(0,-0.20)$) {no primary and replica\\of same shard together};
+  \node[small note] at ($(n2.south)+(0,-0.20)$) {balanced copies\\when nodes are healthy};
+  \node[small note] at ($(n3.south)+(0,-0.20)$) {replicas serve reads\\and failover};
+
+  \draw[guide] (routing.south) -- (5.20,2.95);
+  \draw[guide] (2.30,2.95) -- (8.10,2.95);
+  \draw[arrow] (2.30,2.95) -- (n1.north);
+  \draw[arrow] (5.20,2.95) -- (n2.north);
+  \draw[arrow] (8.10,2.95) -- (n3.north);
+
+  \node[note box] (credits) at (9.05,3.72) {
+    Managed cluster caveat:\\
+    CPU credits can make short benchmarks look better or worse than steady-state traffic. Track credit balance with p95/p99 latency.
+  };
+  \draw[arrow] (routing.east) -- (credits.west);
+
+  \node[teal note, text width=9.40cm] at (5.25,0.28) {
+    Result baseline: 3 data nodes. With 3 primaries and 1 replica, search can use primary or replica copies, while writes touch one primary and one replica.
+  };
+\end{tikzpicture}
+\endgroup

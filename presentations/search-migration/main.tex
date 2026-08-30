@@ -73,7 +73,7 @@
   \footnotesize
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
-      \begin{block}{What this is about}
+      \begin{block}{What this is mentioned in the story}
         \begin{itemize}
           \item PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25.
           \item CDC-backed data movement and indexer shape.
@@ -82,7 +82,7 @@
       \end{block}
 
     \column{0.48\textwidth}
-      \begin{alertblock}{What this is not about}
+      \begin{alertblock}{What this is not}
         \begin{itemize}
           \item Vector search or embeddings.
           \item RAG context matching or answer generation.
@@ -102,15 +102,15 @@
 \begin{frame}{Problem \& Goal: Initiative}
   \hypertarget{sec:problem}{}
   \begin{itemize}
-    \item The current search worked and users trusted its fuzzy matching behavior.
+    \item The current search worked and users \textbf{trusted} its \textbf{fuzzy matching} behavior.
     \item It ran on PostgreSQL with \textbf{16 CPU} cores and \textbf{64 GB} memory.
-    \item At around 10M records, p99 latency was about 10 seconds.
-    \item Maximum sustainable throughput was around 2 requests per second.
+    \item At around \textbf{10M} records, \textbf{p99} latency was about \textbf{10 seconds}.
+    \item Maximum sustainable \textbf{throughput} was around \textbf{2 requests per second}.
   \end{itemize}
 
   \vspace{0.5cm}
   \begin{block}{Goal}
-    Bring p99 search latency under 1 second, increase throughput by at least 10x, and preserve the ranking behavior users already trusted.
+    Bring \textbf{p99} search latency \textbf{under 1 second}, increase \textbf{throughput} by at least \textbf{10x}, and \textbf{preserve the ranking behavior} users already trusted.
   \end{block}
 \end{frame}
 
@@ -334,6 +334,15 @@
   \vfill
 \end{frame}
 
+\begin{frame}{Migration Design: Elasticsearch Cluster}
+  \centering
+  \vspace{-0.12cm}
+  \resizebox{0.86\textwidth}{!}{\input{diagrams/04-elasticsearch-cluster-shards.tex}}
+
+  \vspace{0.02cm}
+  {\scriptsize\textbf{Starting point:} $P = \lceil S/T \rceil$, where $S$ is expected primary-index size and $T$ is a 20--50\,GB target per primary shard. Validate with representative data, heap/CPU, write rate, query concurrency, and p95/p99; too many shards add coordination overhead and changing $P$ normally requires reindexing.}
+\end{frame}
+
 \begin{frame}{Migration Design: Document Identity}
   \begin{itemize}
     \item Elasticsearch document ID reused the PostgreSQL row ID.
@@ -536,12 +545,18 @@
 
 \begin{frame}{Validation: Backtesting}
   \hypertarget{sec:validation}{}
+  \footnotesize
   \begin{itemize}
     \item Use historical user queries.
     \item Compare against results users actually selected.
     \item Measure whether Elasticsearch returned the same expected result.
     \item Track ranking differences with metrics such as MRR.
   \end{itemize}
+
+  \vspace{0.25cm}
+  \begin{block}{Why MRR fits ranking validation}
+    Mean Reciprocal Rank rewards putting the first correct result near the top. That matches this search space: users usually need one right company quickly, and moving it from rank 8 to rank 2 matters much more than small changes lower in the list.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Validation: Generated Cases}

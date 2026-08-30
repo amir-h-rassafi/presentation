@@ -47,6 +47,17 @@
     text=SecondaryTeal,
     align=left
   },
+  note box/.style={
+    draw=SecondaryTeal,
+    line width=0.5pt,
+    rounded corners=3pt,
+    fill=SecondaryTeal!7,
+    font=\tiny,
+    text=SecondaryTeal,
+    align=left,
+    inner xsep=5pt,
+    inner ysep=4pt
+  },
   muted note/.style={
     font=\tiny,
     text=MutedText,
@@ -93,7 +104,7 @@
 
   \coordinate (bus) at (7.45,3.20);
   \draw[guide] (partition.south) -- (bus);
-  \draw[guide] (3.45,3.20) -- (9.80,3.20);
+  \draw[guide] (3.45,3.20) -- (8.90,3.20);
   \node[note, anchor=west] at (7.88,3.42) {parallel writes};
 
   \node[shard box] (s1) at (3.45,2.58) {Shard 1};
@@ -118,7 +129,8 @@
   \node[note, align=center] at (6.18,-0.54) {lsn + doc\_id + time};
   \draw[arrow] (index.south) -- (commit.north);
 
-  \node[note, text width=2.55cm, anchor=west] at (9.65,1.05) {
+  \node[note box, text width=2.55cm, anchor=west] at (9.55,1.05) {
+    Index setting option\\
     \texttt{refresh\_interval}\\
     \texttt{30s -> 300s}\\
     reduces refresh pressure\\
