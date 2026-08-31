@@ -114,14 +114,17 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Problem \& Goal: Scaling PostgreSQL}
+\begin{frame}{Problem \& Goal: Options}
+  After applying the available PostgreSQL and index optimizations, the remaining options were:
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
       \begin{itemize}
-        \item The database already had 16 CPU cores and 64 GB memory.
-        \item More CPU helped concurrency more than single-query latency.
-        \item Four requests could still consume all CPU.
-        \item Search load was competing with the source-of-truth database.
+        \item Scale up the database.
+          \begin{itemize}
+            \item More CPU helped throughput and concurrency, but not single-query latency.
+            \item It also kept search coupled to an expensive source-of-truth database.
+          \end{itemize}
+        \item Move search to a dedicated system.
       \end{itemize}
 
     \column{0.48\textwidth}
@@ -137,17 +140,53 @@
   \end{columns}
 \end{frame}
 
+\begin{frame}{Problem \& Goal: Tool Investigation}
+  We evaluated dedicated search engines against the requirements that mattered for production.
+
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.5\textwidth}
+      \begin{itemize}
+        \item Functional and non-functional fit.
+        \item Strong operational community.
+        \item Easy to evolve as search behavior changes.
+        \item Managed and self-hosted deployment options.
+      \end{itemize}
+
+    \column{0.44\textwidth}
+      \begin{block}{Shortlist}
+        \begin{itemize}
+          \item Typesense: strong competitor.
+          \item Meilisearch: strong competitor.
+          \item \textbf{Elasticsearch: best overall score.}
+        \end{itemize}
+      \end{block}
+  \end{columns}
+\end{frame}
+
 \section{Search Concepts}
 \subsection{Text similarity vs search}
 
-\begin{frame}{Search Concepts: Trigram Similarity}
+\begin{frame}{Search Concepts: Why This Matters}
   \hypertarget{sec:search-concepts}{}
+  Because PostgreSQL \texttt{pg\_trgm} and Elasticsearch BM25 match and rank text differently, we need a few concepts before discussing the migration.
+
+  \vspace{0.25cm}
+  \begin{itemize}
+    \item Trigram similarity: how the old search matched fuzzy text.
+    \item Trigram indexes: why p99 latency still had a tail cost.
+    \item BM25: how Elasticsearch scores analyzed search terms.
+    \item Matching tradeoffs and query fuzziness: where behavior changes.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Search Concepts: Trigram Similarity}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.52\textwidth}
       \begin{itemize}
         \item It compares text by slicing strings into 3-character fragments.
         \item Similar strings share many trigrams.
         \item Good for typos, spacing differences, and fuzzy names.
+        \item Language-agnostic character matching; no language-specific stemmer required.
       \end{itemize}
 
       \vspace{0.05cm}
