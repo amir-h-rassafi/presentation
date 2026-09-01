@@ -88,15 +88,14 @@
   line join=round,
   font=\sffamily
 ]
-  \node[store box, minimum width=1.70cm] (checkpoint) at (1.00,4.20) {Elasticsearch\\checkpoint};
+  \node[store box, minimum width=1.70cm] (checkpoint) at (1.00,4.20) {Stored\\checkpoint};
   \node[node box, minimum width=1.60cm] (read) at (3.05,4.20) {Read\\checkpoint};
   \node[store box, minimum width=1.55cm] (bq) at (5.02,4.20) {BigQuery\\new rows};
   \node[partition box] (partition) at (7.45,4.20) {Partition by sharding key\\\texttt{hash(id) \% N}};
 
-  \node[step num] at (1.00,4.83) {1};
-  \node[step num] at (3.05,4.83) {2};
-  \node[step num] at (5.02,4.83) {3};
-  \node[step num] at (7.45,4.83) {4};
+  \node[step num] at (3.05,4.83) {1};
+  \node[step num] at (5.02,4.83) {2};
+  \node[step num] at (7.45,4.83) {3};
 
   \draw[arrow] (checkpoint.east) -- (read.west);
   \draw[arrow] (read.east) -- (bq.west);
@@ -125,8 +124,8 @@
   \draw[arrow] (throttle.south) -- (index.north);
 
   \node[node box, minimum width=2.65cm] (commit) at (6.18,0.03) {Update checkpoint};
-  \node[step num, anchor=west] at ($(commit.east)+(0.18,0)$) {5};
-  \node[note, align=center] at (6.18,-0.54) {lsn + doc\_id + time};
+  \node[step num, anchor=west] at ($(commit.east)+(0.18,0)$) {4};
+  \node[note, align=center] at (6.18,-0.54) {source\_ts + lsn + doc\_id};
   \draw[arrow] (index.south) -- (commit.north);
 
   \node[note box, text width=2.55cm, anchor=west] at (9.55,1.05) {
@@ -137,7 +136,7 @@
     improves bulk throughput
   };
 
-  \draw[feedback] (commit.west) -- (0.25,0.03) -- (0.25,4.20) -- (checkpoint.west);
-  \node[muted note, anchor=west] at (0.38,2.02) {next batch};
+  \draw[feedback] (commit.west) -- (0.55,0.03) -- (0.55,3.55) -- (3.05,3.55) -- (read.south);
+  \node[muted note, anchor=west] at (0.68,2.02) {next batch};
 \end{tikzpicture}
 \endgroup

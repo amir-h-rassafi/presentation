@@ -80,7 +80,7 @@
   \draw[arrow] (fetch.east) -- (write.west);
   \draw[arrow] (write.east) -- (commit.west);
   \draw[feedback] (commit.south) -- ++(0,-0.48) -- ++(-8.65,0) -- (own.south);
-  \node[muted note] at (5.05,2.98) {retry or next batch};
+  \node[muted note, fill=white, inner xsep=3pt] at (5.05,3.16) {retry or next batch};
 
   \node[note] at (5.05,2.42) {\texttt{shard = hash(entity\_unique\_id) \% N}};
   \draw[guide] (2.05,1.94) -- (8.05,1.94);

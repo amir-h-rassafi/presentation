@@ -212,38 +212,43 @@
 \end{frame}
 
 \begin{frame}{Search Concepts: Trigram Indexes}
-  \small
+  \footnotesize
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.49\textwidth}
-      \begin{block}{Big-O intuition}
+    \column{0.5\textwidth}
+      \begin{block}{Bounded-field work model}
         \begin{itemize}
-          \item Build query trigrams: $O(L)$
-          \item No index scan: $O(N \times L)$
-          \item Indexed search: $O(P + C \times L + C\log C)$
+          \item Query trigram extraction is cheap and bounded.
+          \item For names under 50 chars, each recheck is effectively constant.
+          \item Approx order: $O(I + C)$ for fixed-size names.
+          \item Top-20 ranking still examines the candidates.
         \end{itemize}
       \end{block}
 
       \begin{itemize}
-        \item $N$: rows, $L$: text length
-        \item $P$: index pages/postings touched
-        \item $C$: candidate rows rechecked
+        \item $I$: index pages/postings touched
+        \item $C$: candidates after index filtering
       \end{itemize}
 
-    \column{0.47\textwidth}
-      \begin{block}{GIN}
-        Inverted trigram postings. Fast lookup, larger index, heavier writes.
+    \column{0.46\textwidth}
+      \begin{block}{Example query}
+        \texttt{WHERE name \% :q}\\
+        \texttt{ORDER BY similarity(name, :q) DESC}\\
+        \texttt{LIMIT 20}
       \end{block}
 
-      \begin{block}{GiST}
-        Compact signature tree. More flexible, but lossy signatures can increase rechecks.
+      \begin{block}{What changes the cost}
+        \begin{itemize}
+          \item Common trigrams touch more postings.
+          \item Lower threshold increases $C$ and recall.
+          \item Higher threshold reduces $C$ and tail work.
+        \end{itemize}
       \end{block}
 
       \begin{block}{p99 impact}
-        Common terms increase $P$ and $C$; recheck and sorting become the tail cost.
+        Sorting 20 rows is cheap; finding the top 20 among many candidates is not.
       \end{block}
   \end{columns}
 \end{frame}
-
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.44\textwidth}
@@ -374,12 +379,14 @@
 \end{frame}
 
 \begin{frame}{Migration Design: Elasticsearch Cluster}
-  \centering
-  \vspace{-0.12cm}
-  \resizebox{0.86\textwidth}{!}{\input{diagrams/04-elasticsearch-cluster-shards.tex}}
-
-  \vspace{0.02cm}
-  {\scriptsize\textbf{Starting point:} $P = \lceil S/T \rceil$, where $S$ is expected primary-index size and $T$ is a 20--50\,GB target per primary shard. Validate with representative data, heap/CPU, write rate, query concurrency, and p95/p99; too many shards add coordination overhead and changing $P$ normally requires reindexing.}
+  \begin{itemize}
+    \item \textbf{Cluster baseline:} 3 data nodes, each 4 cores / 8 GB RAM.
+    \item \textbf{Index settings:} 3 primary shards and 1 replica.
+    \item \textbf{Allocation:} Elasticsearch places primaries and replicas; we only configure shard and replica counts.
+    \item \textbf{Read/write behavior:} reads can use primary or replica copies; writes go through the primary and replicate.
+    \item \textbf{Shard sizing:} start around 20--50 GB per primary shard, then validate with real data and p95/p99 latency.
+    \item \textbf{Managed cluster caveat:} CPU credits can distort short benchmarks; track credit balance with p95/p99 latency.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Migration Design: Document Identity}
@@ -418,44 +425,103 @@
 \section{Index Design}
 \subsection{Recreating fuzzy-name signals in Elasticsearch}
 
+\begin{frame}{Index Design: Why These Views}
+  \footnotesize
+  \begin{block}{Selection rule}
+    Each field view was chosen to recover one search behavior from the old system, then kept only if it improved ranking without hurting p95/p99 too much.
+  \end{block}
+
+  \vspace{0.05cm}
+  \begin{tabular}{lll}
+    \toprule
+    Search need & Field view & Why it landed \\
+    \midrule
+    Normal name words & Standard text & BM25 baseline \\
+    Exact company name & Normalized keyword & Strong cheap boost \\
+    Partial input & Prefix & Early keystrokes \\
+    Typos / OCR fragments & Character n-gram & Trigram-like recall \\
+    Ordered multi-word names & Word shingle & Adjacent-word signal \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.18cm}
+  \begin{exampleblock}{Why word shingle}
+    \texttt{progema fastighets} becomes its own adjacent-token signal, so it can outrank loose matches that contain only \texttt{progema} or \texttt{fastighets} separately.
+  \end{exampleblock}
+\end{frame}
+
 \begin{frame}{Index Design: Field Views}
   \hypertarget{sec:index-design}{}
-  \begin{center}
-    \begin{tabular}{ll}
-      \toprule
-      Field view & Purpose \\
-      \midrule
-      Standard text & Normal full-text search \\
-      Normalized keyword & Exact and near-exact boost \\
-      Prefix & Beginning-of-name matching \\
-      Character n-gram & Trigram-like typo tolerance \\
-      Word shingle & Multi-word name combinations \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
+  \scriptsize
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.44\textwidth}
+      \begin{tabular}{ll}
+        \toprule
+        Field view & Purpose \\
+        \midrule
+        Standard text & Full-text search \\
+        Normalized keyword & Exact boost \\
+        Prefix & Prefix match \\
+        Character n-gram & Typo tolerance \\
+        Word shingle & Multi-word boost \\
+        \bottomrule
+      \end{tabular}
+
+    \column{0.52\textwidth}
+      \begin{exampleblock}{Example: one source name}
+        \texttt{Progema Fastighets AB}
+
+        \vspace{0.10cm}
+        \begin{tabular}{ll}
+          \textbf{standard} & \texttt{progema}, \texttt{fastighets}, \texttt{ab} \\
+          \textbf{keyword} & \texttt{progema fastighets ab} \\
+          \textbf{prefix} & \texttt{p}, \texttt{pr}, \texttt{pro}, \texttt{prog...} \\
+          \textbf{n-gram} & \texttt{pro}, \texttt{rog}, \texttt{oge...} \\
+          \textbf{shingle} & \texttt{progema fastighets} \\
+        \end{tabular}
+      \end{exampleblock}
+
+      \begin{block}{Query effect}
+        One input can hit several boosted field views.
+      \end{block}
+  \end{columns}
 \end{frame}
 
 \begin{frame}{Index Design: Analyzer Choices}
-  \footnotesize
+  \scriptsize
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.47\textwidth}
-      \begin{exampleblock}{Same text, different terms}
-        \texttt{acme-fastighets.ab}\\[0.16cm]
-        \textbf{standard-like:} \texttt{acme}, \texttt{fastighets}, \texttt{ab}\\
-        \textbf{whitespace-like:} \texttt{acme-fastighets.ab}
+    \column{0.48\textwidth}
+      \begin{exampleblock}{Field setting example}
+        \begin{tabular}{ll}
+          \textbf{field} & \textbf{index/search role} \\
+          \hline
+          \texttt{name} & main analyzed text \\
+          \texttt{name.prefix} & edge-ngram for prefixes \\
+          \texttt{name.ngram} & char n-gram for typos \\
+          \texttt{name.raw} & normalized exact boost \\
+          \texttt{search\_analyzer} & query-time tokenizer \\
+        \end{tabular}
       \end{exampleblock}
 
-      \begin{block}{Why it matters}
-        A tokenizer decides which tokens exist. If it splits on \texttt{-}, \texttt{.}, or space differently, recall and ranking change.
+      \begin{block}{Same text, different terms}
+        \texttt{acme-fastighets.ab}\\[0.10cm]
+        \textbf{standard-like:} \texttt{acme}, \texttt{fastighets}, \texttt{ab}\\
+        \textbf{prefix field:} \texttt{a}, \texttt{ac}, \texttt{acm}, \texttt{acme...}
       \end{block}
 
-    \column{0.49\textwidth}
+    \column{0.48\textwidth}
       \begin{itemize}
-        \item Standard analyzers are good defaults, but punctuation and identifiers need tests.
-        \item Index analyzer and query analyzer must be intentionally compatible.
-        \item Use \texttt{\_analyze} on real names: hyphens, dots, suffixes, casing, OCR noise.
-        \item Add a dedicated field when one tokenization cannot serve all query shapes.
+        \item Multi-fields let one source field be indexed several ways.
+        \item A query can send one user string and match several boosted fields.
+        \item Each field can keep a lighter \texttt{search\_analyzer} at read time.
+        \item More field views mean more index CPU, disk, refresh, and merge work.
+        \item Custom analyzers can combine char filters, a tokenizer, and token filters.
+        \item Use \texttt{\_analyze} on real names before committing the mapping.
       \end{itemize}
+
+      \begin{block}{Design rule}
+        Add a dedicated field when one tokenizer cannot serve exact, prefix, typo-tolerant, and ordered-name queries together.
+      \end{block}
   \end{columns}
 \end{frame}
 

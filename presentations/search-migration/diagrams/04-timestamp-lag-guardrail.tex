@@ -38,6 +38,11 @@
     align=center,
     font=\tiny,
     text=TextInk
+  },
+  phase label/.style={
+    align=center,
+    font=\scriptsize,
+    text=TextInk
   }
 }
 
@@ -51,64 +56,52 @@
   \definecolor{GuardGreen}{HTML}{1E9C3F}
   \definecolor{RiskRed}{HTML}{C92A2A}
 
-  \node[system box] (pg) at (1.00,4.45) {PostgreSQL};
-  \node[system box] (ds) at (3.15,4.45) {Datastream};
-  \node[system box] (bq) at (5.20,4.45) {BigQuery};
-  \node[indexer box] (idx) at (7.10,4.45) {Indexer};
-  \node[system box, minimum width=1.45cm] (es) at (9.45,4.45) {Elasticsearch};
+  \node[system box] (pg) at (1.00,4.30) {PostgreSQL};
+  \node[system box] (ds) at (3.15,4.30) {Datastream};
+  \node[system box] (bq) at (5.20,4.30) {BigQuery};
+  \node[indexer box] (idx) at (7.10,4.30) {Indexer};
+  \node[system box, minimum width=1.45cm] (es) at (9.45,4.30) {Elasticsearch};
 
   \draw[flow arrow] (pg.east) -- (ds.west);
   \draw[flow arrow] (ds.east) -- (bq.west);
   \draw[flow arrow] (bq.east) -- (idx.west);
   \draw[flow arrow] (idx.east) -- (es.west);
 
-  \coordinate (t0) at (0.75,2.12);
-  \coordinate (t1) at (11.40,2.12);
+  \coordinate (t0) at (0.75,2.06);
+  \coordinate (t1) at (11.25,2.06);
   \draw[timeline arrow] (t0) -- (t1);
-  \node[note text, anchor=west] at (11.48,2.03) {now};
+  \node[note text, anchor=west] at (11.34,1.97) {now};
 
   \foreach \x in {1.00,3.15,5.20,7.10} {
-    \draw[TextInk,line width=0.55pt] (\x,1.97) -- (\x,2.27);
+    \draw[TextInk,line width=0.55pt] (\x,1.91) -- (\x,2.21);
   }
+  \coordinate (bqVisible) at (5.20,2.48);
+  \coordinate (readPoint) at (7.38,2.06);
+  \coordinate (bufferStart) at (7.62,2.06);
+  \coordinate (bufferEnd) at (8.84,2.06);
+  \coordinate (unsafeStart) at (9.04,2.06);
+  \coordinate (unsafeEnd) at (10.25,2.06);
 
-  \coordinate (bqVisible) at (5.20,2.52);
-  \coordinate (readPoint) at (7.40,2.12);
-  \coordinate (bufferStart) at (7.62,2.12);
-  \coordinate (bufferEnd) at (8.78,2.12);
-  \coordinate (avoidStart) at (9.02,2.12);
-  \coordinate (avoidEnd) at (9.72,2.12);
-
-  \draw[marker line] (bq.south) -- (bqVisible) -- (5.20,2.32);
+  \draw[marker line] (bq.south) -- (bqVisible) -- (5.20,2.28);
   \draw[marker line] (idx.south) -- (readPoint);
 
-  \draw[fill=GuardGreen!30,draw=GuardGreen,line width=0.65pt] (readPoint) circle (0.10);
-  \draw[flow arrow, draw=GuardGreen] (6.92,1.25) -- ($(readPoint)+(-0.02,-0.02)$);
-  \node[tiny note, text=GuardGreen, anchor=east] at (6.88,1.18) {read here};
+  \draw[fill=GuardGreen!30,draw=GuardGreen,line width=0.75pt] (readPoint) circle (0.11);
+  \node[tiny note, text=GuardGreen, anchor=south] at (7.38,2.34) {safe read cutoff};
 
-  \draw[draw=MutedText,line width=0.4pt] (bufferStart) -- (bufferEnd);
-  \foreach \x in {7.66,7.80,...,8.66} {
-    \draw[MutedText!55,line width=0.3pt] (\x,1.95) -- ++(0.22,0.34);
+  \draw[draw=MutedText,line width=0.45pt] (bufferStart) -- (bufferEnd);
+  \foreach \x in {7.66,7.82,...,8.66} {
+    \draw[MutedText!55,line width=0.3pt] (\x,1.90) -- ++(0.22,0.32);
   }
-  \draw[TextInk,line width=0.45pt] ($(bufferStart)+(0,-0.15)$) -- ++(0,-0.09) -- ($(bufferEnd)+(0,-0.24)$) -- ++(0,0.09);
-  \node[tiny note] at (8.20,1.48) {buffer\\(few min)};
+  \node[tiny note] at (8.23,1.55) {lag buffer\\few minutes};
 
-  \draw[fill=RiskRed!15,draw=RiskRed,line width=0.7pt] (9.02,1.95) rectangle (9.72,2.31);
-  \foreach \x in {9.06,9.18,...,9.62} {
-    \draw[RiskRed!65,line width=0.3pt] (\x,1.97) -- ++(0.18,0.30);
+  \draw[fill=RiskRed!12,draw=RiskRed,line width=0.7pt] (9.04,1.88) rectangle (10.25,2.24);
+  \foreach \x in {9.10,9.26,...,10.02} {
+    \draw[RiskRed!62,line width=0.3pt] (\x,1.89) -- ++(0.22,0.32);
   }
-  \node[tiny note, text=RiskRed] at (9.37,3.25) {latest\\changes};
-  \draw[RiskRed,line width=0.55pt] (9.37,2.92) -- (9.37,2.48);
-  \node[tiny note, text=RiskRed] at (9.37,3.03) {avoid};
+  \node[tiny note, text=RiskRed] at (9.64,2.72) {do not read newest\\CDC window};
+  \draw[RiskRed,line width=0.5pt] (9.64,2.48) -- (9.64,2.26);
 
-  \draw[RiskRed,line width=0.45pt,dashed] (10.35,3.20) circle (0.15);
-  \draw[RiskRed,line width=0.45pt] (10.35,3.20) -- ++(0,0.10);
-  \draw[RiskRed,line width=0.45pt] (10.35,3.20) -- ++(0.08,-0.05);
-  \node[tiny note, text=RiskRed, anchor=west] at (10.62,3.18) {lag};
-
-  \draw[RiskRed,line width=0.45pt,dashed] (10.35,2.62) rectangle ++(0.30,0.28);
-  \draw[RiskRed,line width=0.45pt] (10.40,2.76) -- (10.60,2.76);
-  \node[tiny note, text=RiskRed, anchor=west] at (10.78,2.76) {partial};
-
-  \node[note text] at (6.05,0.62) {Safer under normal conditions: read behind the newest CDC window.};
+  \node[phase label] at (4.05,1.35) {already indexed};
+  \node[note text] at (6.05,0.70) {Guardrail: lag keeps checkpoint from passing CDC rows that have not arrived yet.};
 \end{tikzpicture}
 \endgroup

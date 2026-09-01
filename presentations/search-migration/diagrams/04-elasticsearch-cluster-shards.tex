@@ -81,7 +81,7 @@
   font=\sffamily
 ]
   \node[setting box] (settings) at (1.40,3.75) {
-    Production index settings\\[0.04cm]
+    Target index settings\\[0.04cm]
     \texttt{number\_of\_shards: 3}\\
     \texttt{number\_of\_replicas: 1}
   };
@@ -94,19 +94,22 @@
 
   \draw[arrow] (settings.east) -- (routing.west);
 
-  \node[node box] (n1) at (2.30,1.88) {Data node 1};
-  \node[node box] (n2) at (5.20,1.88) {Data node 2};
-  \node[node box] (n3) at (8.10,1.88) {Data node 3};
+  \node[node box] (n1) at (2.30,1.88) {};
+  \node[node box] (n2) at (5.20,1.88) {};
+  \node[node box] (n3) at (8.10,1.88) {};
+  \node[font=\tiny, align=center] at ($(n1.north)+(0,-0.28)$) {Data node 1\\4 cores / 8 GB RAM};
+  \node[font=\tiny, align=center] at ($(n2.north)+(0,-0.28)$) {Data node 2\\4 cores / 8 GB RAM};
+  \node[font=\tiny, align=center] at ($(n3.north)+(0,-0.28)$) {Data node 3\\4 cores / 8 GB RAM};
 
-  \node[primary shard] at ($(n1.center)+(-0.42,0.10)$) {P0};
-  \node[replica shard] at ($(n1.center)+(0.50,0.10)$) {R2};
-  \node[primary shard] at ($(n2.center)+(-0.42,0.10)$) {P1};
-  \node[replica shard] at ($(n2.center)+(0.50,0.10)$) {R0};
-  \node[primary shard] at ($(n3.center)+(-0.42,0.10)$) {P2};
-  \node[replica shard] at ($(n3.center)+(0.50,0.10)$) {R1};
+  \node[primary shard] at ($(n1.center)+(-0.42,-0.08)$) {P0};
+  \node[replica shard] at ($(n1.center)+(0.50,-0.08)$) {R2};
+  \node[primary shard] at ($(n2.center)+(-0.42,-0.08)$) {P1};
+  \node[replica shard] at ($(n2.center)+(0.50,-0.08)$) {R0};
+  \node[primary shard] at ($(n3.center)+(-0.42,-0.08)$) {P2};
+  \node[replica shard] at ($(n3.center)+(0.50,-0.08)$) {R1};
 
   \node[small note] at ($(n1.south)+(0,-0.20)$) {no primary and replica\\of same shard together};
-  \node[small note] at ($(n2.south)+(0,-0.20)$) {balanced copies\\when nodes are healthy};
+  \node[small note] at ($(n2.south)+(0,-0.20)$) {Elasticsearch-managed\\allocation};
   \node[small note] at ($(n3.south)+(0,-0.20)$) {replicas serve reads\\and failover};
 
   \draw[guide] (routing.south) -- (5.20,2.95);
@@ -122,7 +125,7 @@
   \draw[arrow] (routing.east) -- (credits.west);
 
   \node[teal note, text width=9.40cm] at (5.25,0.28) {
-    Result baseline: 3 data nodes. With 3 primaries and 1 replica, search can use primary or replica copies, while writes touch one primary and one replica.
+    Example allocation only: Elasticsearch places shards across 3 data nodes (4 cores, 8 GB RAM each). P0--P2 are primaries; R0--R2 are replicas.
   };
 \end{tikzpicture}
 \endgroup
