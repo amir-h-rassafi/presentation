@@ -141,26 +141,27 @@
 \end{frame}
 
 \begin{frame}{Problem \& Goal: Tool Investigation}
-  We evaluated dedicated search engines against the requirements that mattered for production.
+  The latency target defined the bar; the selection also depended on the long-term operating model.
 
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.5\textwidth}
-      \begin{itemize}
-        \item Functional and non-functional fit.
-        \item Strong operational community.
-        \item Easy to evolve as search behavior changes.
-        \item Managed and self-hosted deployment options.
-      \end{itemize}
+  \tiny
+  \setlength{\tabcolsep}{2pt}
+  \begin{tabular}{p{0.19\textwidth}p{0.24\textwidth}p{0.24\textwidth}p{0.24\textwidth}}
+    \toprule
+    \textbf{Factor} & \textbf{Typesense} & \textbf{Meilisearch} & \textbf{Elasticsearch} \\
+    \midrule
+    HA and scale & Raft; whole dataset on every node. & HA/sharding in self-hosted Enterprise Edition; manual leader. & Shards/replicas; mature cluster operations. \\
+    Data size & Fast search; scale path less proven. & Sharding is newer and edition-gated. & \eq\M docs/shard guidance; billions proven. \\
+    Ecosystem & \	extasciitilde\.5k GitHub stars. & \	extasciitilde\.2k stars. & \	extasciitilde\.9k; broadest ops community. \\
+    Future options & C++ implementation; vector search available. & Rust implementation; vector/AI search available. & Java/Lucene; full-text, vector, and hybrid search in one platform. \\
+    \bottomrule
+  \end{tabular}
 
-    \column{0.44\textwidth}
-      \begin{block}{Shortlist}
-        \begin{itemize}
-          \item Typesense: strong competitor.
-          \item Meilisearch: strong competitor.
-          \item \textbf{Elasticsearch: best overall score.}
-        \end{itemize}
-      \end{block}
-  \end{columns}
+  \vspace{0.12cm}
+  \begin{block}{Decision}
+    \textbf{Elasticsearch won on the combined score:} scale confidence, HA maturity, ecosystem, deployment flexibility, and room to add hybrid/vector retrieval later. The other engines remained credible options; language choice alone was not treated as a benchmark.
+  \end{block}
+
+  \tiny\textcolor{MutedText}{Checked Sep 2026: official Typesense, Meilisearch, and Elastic docs; GitHub star counts are approximate and will change.}
 \end{frame}
 
 \section{Search Concepts}
