@@ -348,7 +348,7 @@
 \end{frame}
 
 \begin{frame}{Search Concepts: Query Fuzziness}
-  \small
+  \scriptsize
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
       \begin{block}{Query shape}
@@ -361,6 +361,13 @@
         \item Boosts decide which fields matter more.
       \end{itemize}
 
+      \begin{exampleblock}{Example: filtered + boosted}
+        \scriptsize
+        \texttt{filter: country = SE}\\
+        \texttt{match: name = acme fast}\\
+        \texttt{boost: name.raw}
+      \end{exampleblock}
+
     \column{0.48\textwidth}
       \begin{block}{Fuzziness}
         \texttt{fuzziness: AUTO} expands terms to nearby spellings.
@@ -368,14 +375,23 @@
 
       \begin{itemize}
         \item Better recall for typos and name variants.
-        \item More expanded terms means more work per query.
-        \item Prefix length and max expansions control latency.
+        \item More expansions increase query work.
+        \item Prefix length and max expansions limit the cost.
       \end{itemize}
+
+      \begin{exampleblock}{Example: typo-tolerant}
+        \scriptsize
+        \texttt{query: progema fastighetts}\\
+        \texttt{fuzziness: AUTO}\\
+        \texttt{prefix length: 1}
+
+        Finds: \texttt{Progema Fastighets AB}
+      \end{exampleblock}
   \end{columns}
 
   \vspace{0.05cm}
   \begin{block}{Latency tradeoff}
-    Target fuzziness at the fields that need it; broad fuzzy matching can increase p99 even when average latency looks fine.
+    Target fuzziness where needed: broad matching can raise p99.
   \end{block}
 \end{frame}
 
