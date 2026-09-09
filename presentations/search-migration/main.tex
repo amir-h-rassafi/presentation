@@ -102,7 +102,7 @@
 \begin{frame}{Problem \& Goal: Initiative}
   \hypertarget{sec:problem}{}
   \begin{itemize}
-    \item The search covers multilingual company and legal-entity names, with spelling, spacing, and OCR noise.
+    \item The search covers multilingual company and legal-entity names, with spelling and spacing variations.
     \item The current search worked and users \textbf{trusted} its \textbf{fuzzy matching} behavior.
     \item It ran on PostgreSQL with \textbf{16 CPU} cores and \textbf{64 GB} memory.
     \item At around \textbf{10M} records, \textbf{p99} latency was about \textbf{10 seconds}.
@@ -493,7 +493,7 @@
         \item \texttt{name}: normal BM25 search.
         \item \texttt{name.raw}: exact-match boost.
         \item \texttt{name.prefix}: partial input.
-        \item \texttt{name.ngram}: typo and OCR tolerance.
+        \item \texttt{name.ngram}: typo tolerance.
         \item \texttt{name.shingle}: ordered multi-word names.
       \end{itemize}
 
@@ -684,7 +684,7 @@
 
 \begin{frame}{Validation: Generated Cases}
   \begin{itemize}
-    \item Generate OCR-like errors.
+    \item Generate realistic typo and missing-character cases.
     \item Add human typos and missing characters.
     \item Change spacing and casing.
     \item Remove words or groups of words.
