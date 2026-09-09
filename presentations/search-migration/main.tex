@@ -427,7 +427,7 @@
     \item \textbf{Cluster baseline:} 3 data nodes, each 4 cores / 8 GB RAM.
     \item \textbf{Index settings:} 3 primary shards and 1 replica.
     \item \textbf{Allocation:} Elasticsearch places primaries and replicas; we only configure shard and replica counts.
-    \item \textbf{Read/write behavior:} reads can use primary or replica copies; writes go through the primary and replicate.
+    \item \textbf{Read/write behavior:} Elasticsearch routes reads and writes across primary/replica copies by default; we only configure shard and replica counts.
     \item \textbf{Shard sizing:} start around 20--50 GB per primary shard, then validate with real data and p95/p99 latency.
     \item \textbf{Managed cluster caveat:} CPU credits can distort short benchmarks; track credit balance with p95/p99 latency.
   \end{itemize}
