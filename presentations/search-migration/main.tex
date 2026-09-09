@@ -469,66 +469,40 @@
 \section{Index Design}
 \subsection{Recreating fuzzy-name signals in Elasticsearch}
 
-\begin{frame}{Index Design: Why These Views}
-  \footnotesize
-  \begin{block}{Selection rule}
-    Each field view was chosen to recover one search behavior from the old system, then kept only if it improved ranking without hurting p95/p99 too much.
-  \end{block}
-
-  \vspace{0.05cm}
-  \begin{tabular}{lll}
-    \toprule
-    Search need & Field view & Why it landed \\
-    \midrule
-    Normal name words & Standard text & BM25 baseline \\
-    Exact company name & Normalized keyword & Strong cheap boost \\
-    Partial input & Prefix & Early keystrokes \\
-    Typos / OCR fragments & Character n-gram & Trigram-like recall \\
-    Ordered multi-word names & Word shingle & Adjacent-word signal \\
-    \bottomrule
-  \end{tabular}
-
-  \vspace{0.18cm}
-  \begin{exampleblock}{Why word shingle}
-    \texttt{progema fastighets} becomes its own adjacent-token signal, so it can outrank loose matches that contain only \texttt{progema} or \texttt{fastighets} separately.
-  \end{exampleblock}
-\end{frame}
-
-\begin{frame}{Index Design: Field Views}
+\begin{frame}[fragile]{Index Design: Elasticsearch Multi-fields}
   \hypertarget{sec:index-design}{}
-  \scriptsize
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.44\textwidth}
-      \begin{tabular}{ll}
-        \toprule
-        Field view & Purpose \\
-        \midrule
-        Standard text & Full-text search \\
-        Normalized keyword & Exact boost \\
-        Prefix & Prefix match \\
-        Character n-gram & Typo tolerance \\
-        Word shingle & Multi-word boost \\
-        \bottomrule
-      \end{tabular}
-
     \column{0.52\textwidth}
-      \begin{exampleblock}{Example: one source name}
-        \texttt{Progema Fastighets AB}
+      \begin{block}{One source field, several indexed forms}
+        \scriptsize
+\begin{verbatim}
+"name": {
+  "type": "text",
+  "fields": {
+    "raw":    { "type": "keyword" },
+    "prefix": { "type": "text" },
+    "ngram": { "type": "text" },
+    "shingle": { "type": "text" }
+  }
+}
+\end{verbatim}
+      \end{block}
 
-        \vspace{0.10cm}
-        \begin{tabular}{ll}
-          \textbf{standard} & \texttt{progema}, \texttt{fastighets}, \texttt{ab} \\
-          \textbf{keyword} & \texttt{progema fastighets ab} \\
-          \textbf{prefix} & \texttt{p}, \texttt{pr}, \texttt{pro}, \texttt{prog...} \\
-          \textbf{n-gram} & \texttt{pro}, \texttt{rog}, \texttt{oge...} \\
-          \textbf{shingle} & \texttt{progema fastighets} \\
-        \end{tabular}
-      \end{exampleblock}
+    \column{0.42\textwidth}
+      \begin{itemize}
+        \item \texttt{name}: normal BM25 search.
+        \item \texttt{name.raw}: exact-match boost.
+        \item \texttt{name.prefix}: partial input.
+        \item \texttt{name.ngram}: typo and OCR tolerance.
+        \item \texttt{name.shingle}: ordered multi-word names.
+      \end{itemize}
 
-      \begin{block}{Query effect}
-        One input can hit several boosted field views.
+      \begin{block}{Design rule}
+        One user input can query several multi-fields with different boosts. We add a field only when one analyzer cannot serve the required behavior.
       \end{block}
   \end{columns}
+
+  \tiny\textcolor{MutedText}{The mapping is illustrative; analyzer settings and boosts are validated against real multilingual company names.}
 \end{frame}
 
 \begin{frame}{Index Design: Analyzer Choices}
@@ -558,7 +532,7 @@
         \item Multi-fields let one source field be indexed several ways.
         \item A query can send one user string and match several boosted fields.
         \item Each field can keep a lighter \texttt{search\_analyzer} at read time.
-        \item More field views mean more index CPU, disk, refresh, and merge work.
+        \item More multi-fields mean more index CPU, disk, refresh, and merge work.
         \item Custom analyzers can combine char filters, a tokenizer, and token filters.
         \item Use \texttt{\_analyze} on real names before committing the mapping.
       \end{itemize}
