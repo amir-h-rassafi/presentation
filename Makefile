@@ -32,10 +32,10 @@ html:
 dist/%.pdf: presentations/%/main.tex common/preamble.tex
 	@mkdir -p build/$* dist
 	@if command -v latexmk >/dev/null 2>&1; then \
-		cd presentations/$* && latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=../../build/$* main.tex; \
+		cd presentations/$* && latexmk -xelatex -interaction=nonstopmode -halt-on-error -outdir=../../build/$* main.tex; \
 	else \
-		cd presentations/$* && pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/$* main.tex && \
-			pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/$* main.tex; \
+		cd presentations/$* && xelatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/$* main.tex && \
+			xelatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/$* main.tex; \
 	fi
 	@cp build/$*/main.pdf $@
 

@@ -18,7 +18,7 @@ Each presentation lives in `presentations/<name>/main.tex`. Shared packages and
 theme settings belong in `common/preamble.tex`.
 
 ## Local Builds
-Prerequisite: install a LaTeX distribution with Beamer/PGF support. On Ubuntu/Debian, the CI uses `latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures`.
+Prerequisite: install a XeLaTeX distribution with Beamer/PGF support. On Ubuntu/Debian, the CI uses `latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures texlive-xetex`.
 
 Build every presentation:
 

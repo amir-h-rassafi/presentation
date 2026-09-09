@@ -42,13 +42,13 @@ jobs:
       - name: Install LaTeX
         run: |
           sudo apt-get update
-          sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures
+          sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures texlive-xetex
 
       - name: Build PDF
         run: |
           mkdir -p "build/${{ matrix.presentation }}" dist
           cd "presentations/${{ matrix.presentation }}"
-          latexmk -pdf -interaction=nonstopmode -halt-on-error \
+          latexmk -xelatex -interaction=nonstopmode -halt-on-error \
             -outdir="$GITHUB_WORKSPACE/build/${{ matrix.presentation }}" \
             main.tex
           cd "$GITHUB_WORKSPACE"
