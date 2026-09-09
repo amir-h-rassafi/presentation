@@ -102,6 +102,7 @@
 \begin{frame}{Problem \& Goal: Initiative}
   \hypertarget{sec:problem}{}
   \begin{itemize}
+    \item The search covers multilingual company and legal-entity names, with spelling, spacing, and OCR noise.
     \item The current search worked and users \textbf{trusted} its \textbf{fuzzy matching} behavior.
     \item It ran on PostgreSQL with \textbf{16 CPU} cores and \textbf{64 GB} memory.
     \item At around \textbf{10M} records, \textbf{p99} latency was about \textbf{10 seconds}.
@@ -183,38 +184,56 @@
 \end{frame}
 
 \begin{frame}{Search Concepts: Trigram Similarity}
+  \begin{block}{What it is}
+    A trigram is a rolling 3-character window. Similar strings share many windows, even when spelling or spacing differs.
+  \end{block}
+
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.52\textwidth}
+    \column{0.48\textwidth}
       \begin{itemize}
-        \item It compares text by slicing strings into 3-character fragments.
-        \item Similar strings share many trigrams.
-        \item Good for typos, spacing differences, and fuzzy names.
-        \item Language-agnostic character matching; no language-specific stemmer required.
+        \item Useful for typos, spacing differences, and fuzzy names.
+        \item Character-based matching works across languages without a language-specific stemmer.
+        \item In this domain, the fields are multilingual company and legal-entity names.
       \end{itemize}
 
-      \vspace{0.05cm}
-      \begin{exampleblock}{Example}
-        \texttt{search} $\rightarrow$ \texttt{\{ s, se, sea, ear, arc, rch, ch \}}\\
-        \texttt{serch} $\rightarrow$ \texttt{\{ s, se, ser, erc, rch, ch \}}
+    \column{0.44\textwidth}
+      \begin{block}{Why it fits}
+        \centering
+        \large Names are short, noisy, and\\[0.12cm]
+        users usually know only an approximate spelling.
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Search Concepts: Trigram Similarity Example}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.58\textwidth}
+      \begin{exampleblock}{Compare the fragments}
+        \texttt{search} $\rightarrow$ \texttt{\{s, se, sea, ear, arc, rch, ch\}}\\
+        \texttt{serch} $\rightarrow$ \texttt{\{s, se, ser, erc, rch, ch\}}
       \end{exampleblock}
 
-    \column{0.42\textwidth}
+      \vspace{0.18cm}
+      \begin{block}{The intuition}
+        Four fragments are shared; the missing or changed fragments explain why the match is similar, but not exact.
+      \end{block}
+
+    \column{0.34\textwidth}
       \begin{block}{Shared fragments}
-        \centering\Large 4
+        \centering\Huge 4
       \end{block}
 
       \begin{block}{Unique fragments}
-        \centering\Large 9
+        \centering\Huge 9
       \end{block}
 
-      \vspace{0.2cm}
       \begin{center}
         \large similarity = 4 / 9 = 0.44
       \end{center}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Search Concepts: Trigram Indexes}
+\begin{frame}[shrink=8]{Search Concepts: Trigram Indexes}
   \footnotesize
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.5\textwidth}
@@ -233,10 +252,16 @@
       \end{itemize}
 
     \column{0.46\textwidth}
-      \begin{block}{Example query}
+      \begin{block}{PostgreSQL \texttt{pg\_trgm}}
         \texttt{WHERE name \% :q}\\
         \texttt{ORDER BY similarity(name, :q) DESC}\\
         \texttt{LIMIT 20}
+      \end{block}
+
+      \begin{block}{Elasticsearch n-gram field}
+        \texttt{GET companies/\_search}\\
+        \texttt{match: name.ngram = :q}\\
+        \texttt{size: 20}
       \end{block}
 
       \begin{block}{What changes the cost}
