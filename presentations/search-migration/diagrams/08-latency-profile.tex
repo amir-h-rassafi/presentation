@@ -29,8 +29,7 @@
   \definecolor{GridLine}{HTML}{354051}
   \definecolor{LatencyLine}{HTML}{13AEEA}
 
-  \node[panel label, anchor=west] at (0.25,4.42) {Elasticsearch query latency};
-  \node[axis label, anchor=west] at (3.38,4.42) {single-digit millisecond median, low tail under normal load};
+  \node[panel label, anchor=west] at (0.25,4.42) {Elasticsearch query latency (ms)};
 
   \begin{scope}[shift={(0,0)}]
     \draw[fill=PanelDark,draw=PanelBorder,line width=0.45pt,rounded corners=3pt] (0,0) rectangle (10.75,4.05);
@@ -41,18 +40,12 @@
     }
 
     \foreach \x/\label in {
-      1.30/10:00am,
-      2.15/11:00am,
-      3.00/12:00pm,
-      3.85/1:00pm,
-      4.70/2:00pm,
-      5.55/3:00pm,
-      6.40/4:00pm,
-      7.25/5:00pm,
-      8.10/6:00pm,
-      8.95/7:00pm,
-      9.80/8:00pm,
-      10.40/9:00pm
+      1.30/10am,
+      3.00/12pm,
+      4.70/2pm,
+      6.40/4pm,
+      8.10/6pm,
+      9.80/8pm
     } {
       \draw[GridLine,line width=0.3pt] (\x,0.32) -- (\x,0.24);
       \node[time label, anchor=north] at (\x,0.18) {\label};
