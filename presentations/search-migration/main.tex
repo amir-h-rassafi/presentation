@@ -73,7 +73,7 @@
   \footnotesize
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
-      \begin{block}{What this is mentioned in the story}
+      \begin{block}{What this story covers}
         \begin{itemize}
           \item PostgreSQL \texttt{pg\_trgm} to Elasticsearch BM25.
           \item CDC-backed data movement and indexer shape.
@@ -142,29 +142,16 @@
 \end{frame}
 
 \begin{frame}{Problem \& Goal: Tool Investigation}
-  The latency target defined the bar; the selection also depended on the long-term operating model.\\
-  The initial longlist contained 11 options; because the primary need was a general-purpose full-text and fuzzy search engine, we narrowed it to Typesense, Meilisearch, and Elasticsearch.\\
-
-  \tiny
-  \setlength{\tabcolsep}{2pt}
-  \begin{tabular}{p{0.19\textwidth}p{0.24\textwidth}p{0.24\textwidth}p{0.24\textwidth}}
-    \toprule
-    \textbf{Factor} & \textbf{Typesense} & \textbf{Meilisearch} & \textbf{Elasticsearch} \\
-    \midrule
-    HA and scale & Raft; whole dataset on every node. & HA/sharding in self-hosted Enterprise Edition; manual leader. & Shards/replicas; mature cluster operations. \\
-    Data size & Fast search; scale path less proven. & Sharding is newer and edition-gated. & Up to 200M docs\/shard guidance; billions proven. \\
-    Ecosystem & 26.5k GitHub stars. & 59.2k stars. & 77.9k; broadest ops community. \\
-    Future options & C++; vectors. & Rust; vector/AI search available. & Java/Lucene; full-text, vector, and hybrid search. \\
-    \bottomrule
-  \end{tabular}
-
-  \vspace{0.12cm}
+  Shortlist: Typesense, Meilisearch, and Elasticsearch.
+  \vspace{0.2cm}
+  \begin{itemize}
+    \item Scale: partition the index and grow beyond one node.
+    \item Availability: replicas and established cluster operations.
+    \item Search control: tune analyzers, fields, and ranking signals.
+  \end{itemize}
   \begin{block}{Decision}
-    \textbf{Elasticsearch won on the combined score:} scale confidence, HA maturity, ecosystem, deployment flexibility, and room to add hybrid/vector retrieval later. The other engines remained credible options; language choice alone was not treated as a benchmark.
+    Elasticsearch fit the search requirements and operating model. The latency target was an acceptance criterion; this slide is a requirements comparison, not a three-engine benchmark.
   \end{block}
-
-  \tiny\textcolor{MutedText}{Checked Sep 2026: official Typesense, Meilisearch, and Elastic docs; GitHub star counts are approximate and will change.}
-
 \end{frame}
 
 \section{Search Concepts}
@@ -192,8 +179,8 @@
     \column{0.48\textwidth}
       \begin{itemize}
         \item Useful for typos, spacing differences, and fuzzy names.
-        \item Character-based matching works across languages without a language-specific stemmer.
-        \item In this domain, the fields are multilingual company and legal-entity names.
+        \item Character overlap needs no language-specific stemmer.
+        \item Normalization still matters for accents, case, and punctuation.
       \end{itemize}
 
     \column{0.44\textwidth}
@@ -206,76 +193,61 @@
 \end{frame}
 
 \begin{frame}{Search Concepts: Trigram Similarity Example}
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.58\textwidth}
-      \begin{exampleblock}{Compare the fragments}
-        \texttt{search} $\rightarrow$ \texttt{\{s, se, sea, ear, arc, rch, ch\}}\\
-        \texttt{serch} $\rightarrow$ \texttt{\{s, se, ser, erc, rch, ch\}}
-      \end{exampleblock}
-
-      \vspace{0.18cm}
-      \begin{block}{The intuition}
-        Four fragments are shared; the missing or changed fragments explain why the match is similar, but not exact.
-      \end{block}
-
-    \column{0.34\textwidth}
-      \begin{block}{Shared fragments}
-        \centering\Huge 4
-      \end{block}
-
-      \begin{block}{Unique fragments}
-        \centering\Huge 9
-      \end{block}
-
-      \begin{center}
-        \large similarity = 4 / 9 = 0.44
-      \end{center}
-  \end{columns}
+  \begin{exampleblock}{PostgreSQL pads each word with spaces}
+    \texttt{search} $\rightarrow$ \texttt{\{\_\_s, \_se, sea, ear, arc, rch, ch\_\}}\\[0.2cm]
+    \texttt{serch} $\rightarrow$ \texttt{\{\_\_s, \_se, ser, erc, rch, ch\_\}}
+  \end{exampleblock}
+  \small \texttt{\_} represents a space; every fragment has three characters.
+  \vspace{0.3cm}
+  \begin{block}{Four shared fragments, nine distinct fragments}
+    \centering \Large similarity = 4 / 9 $\approx$ 0.44
+  \end{block}
 \end{frame}
 
-\begin{frame}[shrink=8]{Search Concepts: Trigram Indexes}
-  \footnotesize
+\begin{frame}{Search Concepts: Trigram Indexes}
+  \begin{itemize}
+    \item Common fragments can produce many candidate names.
+    \item Lower similarity thresholds trade more work for more recall.
+    \item Returning 20 results can still require ranking many candidates.
+  \end{itemize}
+  \begin{block}{Query plan matters}
+    GIN filtering plus similarity sorting and GiST nearest-neighbor search have different costs. These latency results describe our workload, not a universal PostgreSQL limit.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Search Concepts: Trigram Queries}
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.5\textwidth}
-      \begin{block}{Bounded-field work model}
-        \begin{itemize}
-          \item Query trigram extraction is cheap and bounded.
-          \item For names under 50 chars, each recheck is effectively constant.
-          \item Approx order: $O(I + C)$ for fixed-size names.
-          \item Top-20 ranking still examines the candidates.
-        \end{itemize}
+    \column{0.48\textwidth}
+      \begin{block}{PostgreSQL: similarity}
+        \scriptsize
+\begin{verbatim}
+SELECT name,
+       similarity(name, 'serch')
+FROM companies
+WHERE name % 'serch'
+ORDER BY
+  similarity(name, 'serch') DESC
+LIMIT 20;
+\end{verbatim}
       \end{block}
-
-      \begin{itemize}
-        \item $I$: index pages/postings touched.
-        \item $C$: candidates after index filtering.
-      \end{itemize}
-
-    \column{0.46\textwidth}
-      \begin{block}{PostgreSQL \texttt{pg\_trgm}}
-        \texttt{WHERE name \% :q}\\
-        \texttt{ORDER BY similarity(name, :q) DESC}\\
-        \texttt{LIMIT 20}
-      \end{block}
-
-      \begin{block}{Elasticsearch n-gram field}
-        \texttt{GET companies/\_search}\\
-        \texttt{match: name.ngram = :q}\\
-        \texttt{size: 20}
-      \end{block}
-
-      \begin{block}{What changes the cost}
-        \begin{itemize}
-          \item Common trigrams touch more postings.
-          \item Lower threshold increases $C$ and recall.
-          \item Higher threshold reduces $C$ and tail work.
-        \end{itemize}
-      \end{block}
-
-      \begin{block}{p99 impact}
-        Sorting 20 rows is cheap; finding the top 20 among many candidates is not.
+    \column{0.48\textwidth}
+      \begin{block}{Elasticsearch: analyzed terms}
+        \scriptsize
+\begin{verbatim}
+GET companies/_search
+{
+  "size": 20,
+  "query": {
+    "match": {
+      "name.ngram": "serch"
+    }
+  }
+}
+\end{verbatim}
       \end{block}
   \end{columns}
+  \vspace{0.15cm}
+  \small The Elasticsearch example analyzes both names and queries into trigrams. BM25 scores their shared terms; it does not reproduce PostgreSQL's similarity formula.
 \end{frame}
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
@@ -363,7 +335,7 @@
       \end{block}
 
       \begin{itemize}
-        \item Exact filters cut the candidate set first.
+        \item Filters restrict matches without adding to the score.
         \item Text clauses score the remaining candidates.
         \item Boosts decide which fields matter more.
       \end{itemize}
@@ -391,21 +363,41 @@
 
 
 
-\begin{frame}{Search Concepts: Query Examples}
+\begin{frame}{Search Concepts: Query Shape}
+  \begin{block}{Our query combines six \texttt{should} clauses}
+    Exact name, prefix, fuzzy prefix, fuzzy text, whitespace-tokenized text, and word shingles.
+  \end{block}
+  \begin{itemize}
+    \item \texttt{minimum\_should\_match: 1} requires one matching clause.
+    \item Matching clauses contribute to the combined score.
+    \item Boosts weight signals; they do not guarantee a fixed ranking order.
+  \end{itemize}
+  \small The complete query and its boosts follow in Index Design.
+\end{frame}
+
+\begin{frame}[fragile]{Search Concepts: Typo Example}
   \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{exampleblock}{Filtered + boosted}
-        \texttt{filter: country = SE}\\
-        \texttt{match: name = acme fast}\\
-        \texttt{boost: name.raw}
+    \column{0.56\textwidth}
+      \small
+\begin{verbatim}
+{
+  "match": {
+    "name": {
+      "query": "progema fastighetts",
+      "boost": 70,
+      "fuzziness": "auto"
+    }
+  }
+}
+\end{verbatim}
+    \column{0.40\textwidth}
+      \begin{exampleblock}{Example candidate}
+        Progema Fastighets AB
       \end{exampleblock}
-    \column{0.48\textwidth}
-      \begin{exampleblock}{Typo-tolerant}
-        \texttt{query: progema fastighetts}\\
-        \texttt{fuzziness: AUTO}\\
-        \texttt{prefix length: 1}\\[0.12cm]
-        Finds: \texttt{Progema Fastighets AB}
-      \end{exampleblock}
+      \small \texttt{fastighetts} differs from \texttt{fastighets} by one insertion.
+      \vspace{0.2cm}
+
+      This is the fuzzy name clause from our query. A separate prefix clause uses \texttt{fuzziness: "1"}.
   \end{columns}
 \end{frame}
 
@@ -423,40 +415,73 @@
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Migration Design: Before And After}
+  \begin{block}{Before}
+    Application $\rightarrow$ PostgreSQL\\[0.15cm]
+    Transactional reads/writes and \texttt{pg\_trgm} search share the database.
+  \end{block}
+  \vspace{0.15cm}
+  \begin{block}{After}
+    Application $\rightarrow$ PostgreSQL for transactional data\\[0.15cm]
+    Application $\rightarrow$ Elasticsearch for search\\[0.15cm]
+    PostgreSQL $\rightarrow$ CDC pipeline $\rightarrow$ Elasticsearch
+  \end{block}
+  \small The migration changes search queries and adds asynchronous indexing.
+\end{frame}
+
 \begin{frame}{Migration Design: Data Path}
   \centering
   \vfill
   \includegraphics[width=0.98\textwidth]{diagrams/02-target-architecture-cropped.pdf}
+  \vspace{0.3cm}
 
-  \vspace{0.25cm}
-  {\scriptsize Mermaid source: \texttt{diagrams/02-target-architecture.mmd}}
+  \small PostgreSQL owns the data; BigQuery holds change history; Elasticsearch serves search.
   \vfill
 \end{frame}
 
 \begin{frame}{Migration Design: Elasticsearch Cluster}
   \begin{itemize}
-    \item \textbf{Cluster baseline:} 3 data nodes, each 4 cores / 8 GB RAM.
-    \item \textbf{Index settings:} 3 primary shards and 1 replica.
-    \item \textbf{Allocation:} Elasticsearch places primaries and replicas; we only configure shard and replica counts.
-    \item \textbf{Read/write behavior:} Elasticsearch routes reads and writes across primary/replica copies by default; we only configure shard and replica counts.
-    \item \textbf{Shard sizing:} start around 20--50 GB per primary shard, then validate with real data and p95/p99 latency.
-    \item \textbf{Managed cluster caveat:} CPU credits can distort short benchmarks; track credit balance with p95/p99 latency.
+    \item 3 data nodes, each with 4 cores and 8 GB RAM.
+    \item 3 primary shards; 1 replica per primary (6 shard copies).
+    \item Elasticsearch handles allocation and request routing.
+    \item Writes go through primaries and replicate to in-sync copies.
+    \item Reads can use primary or replica copies.
   \end{itemize}
+  \begin{block}{Two independent kinds of partitioning}
+    Elasticsearch shards distribute the index. Indexer partitions distribute CDC processing; their counts need not match.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Migration Design: Document Identity}
   \begin{itemize}
-    \item Elasticsearch document ID reused the PostgreSQL row ID.
-    \item Engineers could debug the same entity across systems.
-    \item Retries became idempotent updates, not duplicate documents.
-    \item Replay became a normal recovery path.
+    \item Reuse the PostgreSQL row ID as the Elasticsearch document ID.
+    \item Trace the same entity across the database, CDC, and search.
+    \item Repeating a document replacement avoids duplicate documents.
   \end{itemize}
+  \begin{block}{Replay also needs ordering}
+    A stable ID alone cannot stop an older change overwriting a newer one. Preserve source order or enforce source versions, including deletes.
+  \end{block}
 \end{frame}
 
-\begin{frame}{Migration Design: Indexer Shape}
+\begin{frame}{Migration Design: Indexer Partitions}
   \centering
-  \vspace{-0.1cm}
-  \resizebox{0.93\textwidth}{!}{\input{diagrams/03-indexer-sharding.tex}}
+  \begin{block}{Deterministic assignment}
+    \centering \texttt{partition = hash(entity\_unique\_id) \% N}
+  \end{block}
+  \vspace{0.2cm}
+  \begin{tikzpicture}[every node/.style={draw=PrimaryBlue,rounded corners,align=center,font=\small,minimum height=0.8cm},>=Latex]
+    \node (a) at (0,0) {Partition 0\\owned processing loop};
+    \node (b) at (4,0) {Partition 1\\owned processing loop};
+    \node (c) at (8,0) {Partition $N-1$\\owned processing loop};
+    \node (es) at (4,-1.6) {Elasticsearch\\3 primary shards + replicas};
+    \draw[->] (a) -- (es);
+    \draw[->] (b) -- (es);
+    \draw[->] (c) -- (es);
+  \end{tikzpicture}
+  \vspace{0.15cm}
+
+  \small One active owner per partition; a worker process can host multiple loops.\\
+  $N$ describes indexer partitions, not Elasticsearch shards.
 \end{frame}
 
 \begin{frame}{Migration Design: Timestamp Lag}
@@ -466,12 +491,19 @@
 \end{frame}
 
 \begin{frame}{Migration Design: Checkpointing}
-  \centering
-  \vspace{-0.05cm}
-  \resizebox{0.90\textwidth}{!}{\input{diagrams/04-checkpoint-replay-v3.tex}}
+  \begin{block}{One partition's ordered batch}
+    Read checkpoint $\rightarrow$ fetch rows $\rightarrow$ bulk write\\[0.2cm]
+    Check every item $\rightarrow$ commit the partition checkpoint
+  \end{block}
+  \begin{itemize}
+    \item Cursor: source timestamp, source sequence / LSN, document ID.
+    \item Advance only past successfully handled events.
+    \item On failure, retry from the last committed checkpoint.
+  \end{itemize}
+  \small An HTTP success response does not mean every bulk item succeeded.
 \end{frame}
 
-\begin{frame}{Migration Design: Shard State Machine}
+\begin{frame}{Migration Design: Partition State Machine}
   \centering
   \vspace{-0.05cm}
   \resizebox{0.92\textwidth}{!}{\input{diagrams/04-shard-state-machine-v3.tex}}
@@ -482,76 +514,40 @@
 
 \begin{frame}[fragile]{Index Design: Elasticsearch Multi-fields}
   \hypertarget{sec:index-design}{}
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.52\textwidth}
-      \begin{block}{One source field, several indexed forms}
-        \scriptsize
+  \scriptsize
 \begin{verbatim}
 "name": {
-  "type": "text",
+  "type": "text", "analyzer": "name_words",
   "fields": {
-    "raw":    { "type": "keyword" },
-    "prefix": { "type": "text" },
-    "ngram": { "type": "text" },
-    "shingle": { "type": "text" }
+    "normalized_keyword": {
+      "type": "keyword", "normalizer": "name_exact"
+    },
+    "prefix": {
+      "type": "text", "analyzer": "name_prefix",
+      "search_analyzer": "name_words"
+    },
+    "whitespace_tokenizer": {
+      "type": "text", "analyzer": "name_whitespace"
+    },
+    "word_shingle": {
+      "type": "text", "analyzer": "name_shingle"
+    }
   }
 }
 \end{verbatim}
-      \end{block}
-
-    \column{0.42\textwidth}
-      \begin{itemize}
-        \item \texttt{name}: normal BM25 search.
-        \item \texttt{name.raw}: exact-match boost.
-        \item \texttt{name.prefix}: partial input.
-        \item \texttt{name.ngram}: typo tolerance.
-        \item \texttt{name.shingle}: ordered multi-word names.
-      \end{itemize}
-
-      \begin{block}{Design rule}
-        One user input can query several multi-fields with different boosts. We add a field only when one analyzer cannot serve the required behavior.
-      \end{block}
-  \end{columns}
-
-  \tiny\textcolor{MutedText}{The mapping is illustrative; analyzer settings and boosts are validated against real multilingual company names.}
+  \small Actual query field names; analyzer definitions here remain illustrative.
 \end{frame}
 
 \begin{frame}{Index Design: Analyzer Choices}
-  \scriptsize
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{exampleblock}{Field setting example}
-        \begin{tabular}{ll}
-          \textbf{field} & \textbf{index/search role} \\
-          \hline
-          \texttt{name} & main analyzed text \\
-          \texttt{name.prefix} & edge-ngram for prefixes \\
-          \texttt{name.ngram} & char n-gram for typos \\
-          \texttt{name.raw} & normalized exact boost \\
-          \texttt{search\_analyzer} & query-time tokenizer \\
-        \end{tabular}
-      \end{exampleblock}
-
-      \begin{block}{Same text, different terms}
-        \texttt{acme-fastighets.ab}\\[0.10cm]
-        \textbf{standard-like:} \texttt{acme}, \texttt{fastighets}, \texttt{ab}\\
-        \textbf{prefix field:} \texttt{a}, \texttt{ac}, \texttt{acm}, \texttt{acme...}
-      \end{block}
-
-    \column{0.48\textwidth}
-      \begin{itemize}
-        \item Multi-fields let one source field be indexed several ways.
-        \item A query can send one user string and match several boosted fields.
-        \item Each field can keep a lighter \texttt{search\_analyzer} at read time.
-        \item More multi-fields mean more index CPU, disk, refresh, and merge work.
-        \item Custom analyzers can combine char filters, a tokenizer, and token filters.
-        \item Use \texttt{\_analyze} on real names before committing the mapping.
-      \end{itemize}
-
-      \begin{block}{Design rule}
-        Add a dedicated field when one tokenizer cannot serve exact, prefix, typo-tolerant, and ordered-name queries together.
-      \end{block}
-  \end{columns}
+  \begin{itemize}
+    \item Normalize case consistently across indexed names and queries.
+    \item Prefix field: index edge n-grams; search with whole word tokens.
+    \item Whitespace field: split on spaces to retain a different token boundary signal.
+    \item Shingle field: index and query adjacent word sequences.
+  \end{itemize}
+  \begin{block}{Test the tokens}
+    Use \texttt{\_analyze} with short names, accents, abbreviations, and punctuation such as \texttt{A-TE}. A field name alone does not define its analyzer.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Index Design: Prefix Matching}
@@ -561,13 +557,25 @@
 
   \vspace{0.05cm}
   \begin{center}
-    \texttt{pro}, \texttt{prog}, \texttt{proge}, \texttt{progem}, \texttt{progema}
+    \texttt{pr}, \texttt{pro}, \texttt{prog}, \texttt{proge}, \texttt{progem}, \texttt{progema}
   \end{center}
 
   \vspace{0.45cm}
   \begin{block}{Use case}
     Users often type only the beginning of a name and expect autocomplete-like behavior.
   \end{block}
+\end{frame}
+
+\begin{frame}{Index Design: Why Separate Prefixes}
+  \begin{itemize}
+    \item A dedicated prefix field exposes its gram lengths and analyzer.
+    \item Its query clause can be weighted separately from exact matches.
+    \item It fits the same multi-field design as our other name signals.
+  \end{itemize}
+  \begin{block}{Alternative: \texttt{search\_as\_you\_type}}
+    Elasticsearch also provides built-in prefix and shingle subfields with configurable analysis. Long names or punctuation alone do not rule it out.
+  \end{block}
+  \small Choose based on required matching behavior and measured relevance/cost.
 \end{frame}
 
 \begin{frame}{Index Design: Character N-Grams}
@@ -582,121 +590,127 @@
 
   \vspace{0.45cm}
   \begin{block}{Use case}
-    This was the closest Elasticsearch signal to the old \texttt{pg\_trgm} behavior.
+    An illustrative character-overlap signal. Our supplied query uses fuzzy text and prefix clauses; it does not query a separate n-gram field.
   \end{block}
 \end{frame}
 
 \begin{frame}{Index Design: Word Shingles}
-  \footnotesize
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.47\textwidth}
-      \begin{exampleblock}{Input}
-        \texttt{progema fastighets ab}
-      \end{exampleblock}
-
-      \vspace{-0.05cm}
-      \begin{center}
-        \texttt{progema}\\
-        \texttt{fastighets}\\
-        \texttt{ab}\\[0.04cm]
-        \texttt{progema fastighets}\\
-        \texttt{fastighets ab}\\
-        \texttt{progema fastighets ab}
-      \end{center}
-
-    \column{0.49\textwidth}
-      \begin{block}{What it adds}
-        Adjacent word groups become searchable tokens.
-      \end{block}
-
-      \begin{itemize}
-        \item Preserves order and nearby-word context.
-        \item Boosts exact company-name fragments.
-        \item Separates phrase matches from loose word overlap.
-        \item Complements n-grams; not typo tolerance.
-      \end{itemize}
-
-      \begin{block}{Ranking effect}
-        \texttt{progema fastighets} prefers the full company name over a one-word overlap.
-      \end{block}
-  \end{columns}
+  \begin{exampleblock}{Input: \texttt{progema fastighets ab}}
+    Two-word shingles:\\[0.15cm]
+    \texttt{progema fastighets}, \texttt{fastighets ab}\\[0.2cm]
+    Three-word shingle:\\[0.15cm]
+    \texttt{progema fastighets ab}
+  \end{exampleblock}
+  \begin{itemize}
+    \item Shingles join adjacent tokens in their original order.
+    \item They add phrase signals alongside individual words.
+    \item They are a text-analysis technique, unrelated to \texttt{pgvector}.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Index Design: Size And Query Cost}
-  \footnotesize
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{tabular}{ll}
-        \toprule
-        Field view & Cost shape \\
-        \midrule
-        Exact keyword & Small \\
-        Prefix & Medium \\
-        Character n-gram & High postings count \\
-        Word shingle & More phrase terms \\
-        Reordered name field & Extra full field \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.24cm}
-      \begin{block}{Estimate before full rollout}
-        Index a 1M-row sample, inspect \texttt{\_disk\_usage}, term counts from \texttt{\_analyze}, and query profiles. Multiply by expected corpus size with replica count included.
-      \end{block}
-
-    \column{0.48\textwidth}
-      \begin{block}{How it helps performance}
-        Precomputed fields move work from query time to indexing time.
-      \end{block}
-
-      \begin{itemize}
-        \item Prefix fields avoid expensive broad fuzzy-prefix queries.
-        \item N-grams recover typo tolerance without scanning every candidate.
-        \item Shingles boost ordered fragments with fewer phrase-query surprises.
-        \item Exact/normalized fields give cheap high-confidence boosts.
-        \item Keep min/max grams tight and drop fields that do not move ranking metrics.
-      \end{itemize}
-  \end{columns}
+  \begin{center}
+    \begin{tabular}{ll}
+      \toprule
+      Indexed form & Additional work \\
+      \midrule
+      Exact keyword & One normalized term per name \\
+      Prefix & Several prefixes per word \\
+      Whitespace text & Another token stream \\
+      Word shingle & Additional adjacent-word terms \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \begin{block}{Measure the trade-off}
+    Index a representative sample. Compare disk usage, indexing throughput, query latency, and relevance before retaining an extra field.
+  \end{block}
 \end{frame}
 
-\begin{frame}{Index Design: Query Strategy}
-  \begin{itemize}
-    \item Combine several name signals at query time.
-    \item Boost exact and normalized matches.
-    \item Use prefix fields for partial input.
-    \item Use n-gram fields for misspellings and fuzzy fragments.
-    \item Use shingles to preserve ordered multi-word context.
-    \item Query reordered name fields for last-first / first-last variants.
-  \end{itemize}
+\begin{frame}[fragile]{Index Design: Our Search Query}
+  \scriptsize
+\begin{verbatim}
+body = {"query": {"bool": {
+    "should": [
+        {"term": {"name.normalized_keyword":
+            {"value": query, "boost": 300}}},
+        {"match": {"name.prefix":
+            {"query": query, "boost": 40}}},
+        {"match": {"name.prefix":
+            {"query": query, "boost": 40, "fuzziness": "1"}}},
+        {"match": {"name":
+            {"query": query, "boost": 70, "fuzziness": "auto"}}},
+        {"match": {"name.whitespace_tokenizer":
+            {"query": query, "boost": 30}}},
+        {"match": {"name.word_shingle":
+            {"query": query, "boost": 10}}},
+    ],
+    "minimum_should_match": 1,
+}}}
+\end{verbatim}
+  \small Python request body; \texttt{query} is the same input string in every clause.
+\end{frame}
 
-  \vspace{0.45cm}
-  \begin{block}{Outcome}
-    Around 90\% similar ranking experience with latency up to about 100 ms.
+\begin{frame}{Index Design: Query Weights}
+  \small
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      Field & Match behavior & Boost \\
+      \midrule
+      \texttt{name.normalized\_keyword} & Exact term & 300 \\
+      \texttt{name.prefix} & Analyzed prefix & 40 \\
+      \texttt{name.prefix} & Fuzziness 1 & 40 \\
+      \texttt{name} & Fuzziness auto & 70 \\
+      \texttt{name.whitespace\_tokenizer} & Analyzed text & 30 \\
+      \texttt{name.word\_shingle} & Adjacent-word signal & 10 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \begin{block}{How the signals combine}
+    At least one clause must match. Scores add across matching clauses; both prefix clauses can contribute to the same result.
   \end{block}
 \end{frame}
 
 \section{Validation}
 \subsection{Proving relevance before production rollout}
 
-\begin{frame}{Validation: Backtesting}
+\begin{frame}{Validation: What MRR Measures}
   \hypertarget{sec:validation}{}
-  \footnotesize
-  \begin{itemize}
-    \item Use historical user queries.
-    \item Compare against results users actually selected.
-    \item Measure whether Elasticsearch returned the same expected result.
-    \item Track ranking differences with metrics such as MRR.
-  \end{itemize}
+  Mean Reciprocal Rank: average $1 / \text{rank}$ of the first relevant result.
+  \vspace{0.2cm}
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      Query & First relevant result & Reciprocal rank \\
+      \midrule
+      A & Rank 1 & 1 \\
+      B & Rank 2 & 0.5 \\
+      C & Missing from top 20 & 0 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \begin{block}{Illustrative MRR@20}
+    $(1 + 0.5 + 0) / 3 = 0.50$\\[0.1cm]
+    Higher is better; use the same queries, relevance labels, and cutoff.
+  \end{block}
+\end{frame}
 
-  \vspace{0.25cm}
-  \begin{block}{Why MRR fits ranking validation}
-    Mean Reciprocal Rank rewards putting the first correct result near the top. That matches this search space: users usually need one right company quickly, and moving it from rank 8 to rank 2 matters much more than small changes lower in the list.
+\begin{frame}{Validation: Backtesting}
+  \begin{itemize}
+    \item Replay historical queries against both search systems.
+    \item Use selected companies as candidate relevance labels.
+    \item Inspect missing results and changes near the top.
+    \item Supplement replay with generated cases and expert review.
+  \end{itemize}
+  \begin{block}{Reading the evidence}
+    Historical selections can reflect the old ranking. MRR is useful for a paired evaluation; the result reported here is the separate human review.
   \end{block}
 \end{frame}
 
 \begin{frame}{Validation: Generated Cases}
   \begin{itemize}
-    \item Generate realistic typo and missing-character cases.
-    \item Add human typos and missing characters.
+    \item Generate realistic spelling-error cases.
+    \item Include actual user typos and missing characters.
     \item Change spacing and casing.
     \item Remove words or groups of words.
     \item Test clean names and messy real-world inputs.
@@ -733,31 +747,52 @@
       \toprule
       Dimension & Before & After \\
       \midrule
-      Search engine & PostgreSQL \texttt{pg\_trgm} & Elasticsearch \\
-      Dataset size & 25M records & 25M replicated records \\
-      Worst query latency & About 15s & Up to about 100ms \\
-      Fuzzy behavior & Native trigram & Multi-field analyzers \\
-      Data freshness & Immediate DB read & About 15 min lag \\
+      Search & PostgreSQL \texttt{pg\_trgm} & Elasticsearch \\
+      Corpus at comparison & 25M records & 25M indexed records \\
+      Authoritative data & PostgreSQL & PostgreSQL \\
+      Name matching & Trigram similarity & Multiple analyzed fields \\
+      Freshness & Current database state & Asynchronous CDC/indexing \\
       \bottomrule
     \end{tabular}
   \end{center}
+  \begin{block}{Two measurements}
+    The initial 10M-record workload motivated the migration. The later comparison used 25M records; do not treat them as the same benchmark.
+  \end{block}
 \end{frame}
 
-\begin{frame}{Outcome: Latency Profile}
-  \centering
-  \vspace{-0.05cm}
-  \includegraphics[width=\textwidth]{assets/latency-profile.jpg}
+\begin{frame}{Outcome: Freshness Trade-off}
+  \begin{itemize}
+    \item Company search accepted roughly 15-minute freshness.
+    \item Changes pass through Datastream, BigQuery, and the indexer.
+    \item A deliberate read buffer allows time for late CDC events.
+    \item Indexing queues and refresh also affect search visibility.
+  \end{itemize}
+  \begin{block}{Business requirement}
+    Searchable company data could be asynchronous. Transactional reads and writes remained in PostgreSQL.
+  \end{block}
 \end{frame}
 
-\begin{frame}{Outcome: Latency Tail Comparison}
+\begin{frame}{Outcome: Latency Comparison}
   \centering
-  \includegraphics[width=0.82\textwidth]{assets/latency-tail-ccdf.png}
+  \includegraphics[height=0.74\textheight]{assets/latency-tail-ccdf.png}
+\end{frame}
+
+\begin{frame}{Outcome: Reading The Tail}
+  \begin{itemize}
+    \item Horizontal axis: query latency; lower is faster.
+    \item Vertical axis: share of requests at or above that latency.
+    \item At 1\%, read the approximate p99 latency.
+    \item The Elasticsearch curve is faster, but still has requests above 1 second.
+  \end{itemize}
+  \begin{block}{Scope}
+    The plotted comparison contains 5,263 observations per system. It does not establish a 100 ms maximum or the achieved throughput.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Outcome: Lessons}
   \begin{itemize}
     \item Search migration is not only a database replacement.
-    \item The replication path needs operational visibility and replayability.
+    \item Monitor replication lag and failures; support replay.
     \item Analyzer design matters as much as the search engine.
     \item Ranking metrics are useful, but human judgement can change the decision.
     \item Idempotent writes and checkpoints reduce operational risk.
@@ -767,8 +802,19 @@
 \begin{frame}{Outcome: Closing}
   \begin{center}
     \Large
-    Elasticsearch replaced \texttt{pg\_trgm} as the search engine, but not as a drop-in implementation.\\[0.35cm]
-    It recreated the useful signals through analyzers, weighting, benchmarks, and a replayable indexing pipeline.
+    PostgreSQL remains the source of truth.\\[0.35cm]
+    Elasticsearch serves company search.\\[0.35cm]
+    \normalsize
+    The migration changed ranking and added a replayable indexing pipeline.
+  \end{center}
+\end{frame}
+
+\begin{frame}[plain]
+  \begin{center}
+    {\Huge\bfseries\textcolor{PrimaryBlue}{Thank you}}\\[0.7cm]
+    {\Large Amir Hossein Rassafi}\\[0.2cm]
+    Head of Platform at Condukt\\[0.4cm]
+    \href{https://amir-h-rassafi.github.io}{amir-h-rassafi.github.io}
   \end{center}
 \end{frame}
 

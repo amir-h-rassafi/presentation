@@ -1,0 +1,96 @@
+# Illustration, not production configuration.
+# First create a disposable index named companies-talk-demo using
+# PUT companies-talk-demo with the body in example-index.json.
+
+PUT companies-talk-demo/_doc/1?refresh=wait_for
+{"name":"Progema Fastighets AB","country":"SE"}
+
+PUT companies-talk-demo/_doc/2?refresh=wait_for
+{"name":"Search AB","country":"SE"}
+
+# Inspect punctuation and accents before choosing production analysis.
+POST companies-talk-demo/_analyze
+{"analyzer":"name_words","text":["A-TE","acme-fastighets.ab","Société Générale"]}
+
+POST companies-talk-demo/_analyze
+{"analyzer":"name_prefix","text":"progema"}
+
+POST companies-talk-demo/_analyze
+{"analyzer":"name_trigram","text":"progema"}
+
+POST companies-talk-demo/_analyze
+{"analyzer":"name_whitespace","text":"acme-fastighets ab"}
+
+POST companies-talk-demo/_analyze
+{"analyzer":"name_shingle","text":"progema fastighets ab"}
+
+# Educational n-gram example, not a clause in the supplied query.
+# Character overlap: search and serch share "rch" with this unpadded analyzer.
+GET companies-talk-demo/_search
+{"size":20,"query":{"match":{"name.ngram":"serch"}}}
+
+# Prefix input should match Progema Fastighets AB.
+GET companies-talk-demo/_search
+{"query":{"match":{"name.prefix":"prog"}}}
+
+# Actual six-clause query supplied by Amir; only the input is substituted.
+GET companies-talk-demo/_search
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "term": {
+            "name.normalized_keyword": {
+              "value": "progema fastighets ab",
+              "boost": 300
+            }
+          }
+        },
+        {
+          "match": {
+            "name.prefix": {
+              "query": "progema fastighets ab",
+              "boost": 40
+            }
+          }
+        },
+        {
+          "match": {
+            "name.prefix": {
+              "query": "progema fastighets ab",
+              "boost": 40,
+              "fuzziness": "1"
+            }
+          }
+        },
+        {
+          "match": {
+            "name": {
+              "query": "progema fastighets ab",
+              "boost": 70,
+              "fuzziness": "auto"
+            }
+          }
+        },
+        {
+          "match": {
+            "name.whitespace_tokenizer": {
+              "query": "progema fastighets ab",
+              "boost": 30
+            }
+          }
+        },
+        {
+          "match": {
+            "name.word_shingle": {
+              "query": "progema fastighets ab",
+              "boost": 10
+            }
+          }
+        }
+      ],
+      "minimum_should_match": 1
+    }
+  }
+}

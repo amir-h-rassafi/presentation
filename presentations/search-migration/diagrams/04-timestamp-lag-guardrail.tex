@@ -86,7 +86,7 @@
   \draw[marker line] (idx.south) -- (readPoint);
 
   \draw[fill=GuardGreen!30,draw=GuardGreen,line width=0.75pt] (readPoint) circle (0.11);
-  \node[tiny note, text=GuardGreen, anchor=south] at (7.38,2.34) {safe read cutoff};
+  \node[tiny note, text=GuardGreen, anchor=south] at (7.38,2.34) {buffered read cutoff};
 
   \draw[draw=MutedText,line width=0.45pt] (bufferStart) -- (bufferEnd);
   \foreach \x in {7.66,7.82,...,8.66} {
@@ -102,6 +102,6 @@
   \draw[RiskRed,line width=0.5pt] (9.64,2.48) -- (9.64,2.26);
 
   \node[phase label] at (4.05,1.35) {already indexed};
-  \node[note text] at (6.05,0.70) {Guardrail: lag keeps checkpoint from passing CDC rows that have not arrived yet.};
+  \node[note text] at (6.05,0.70) {The buffer reduces late-arrival risk; it does not guarantee completeness.};
 \end{tikzpicture}
 \endgroup

@@ -1,0 +1,107 @@
+{
+  "settings": {
+    "analysis": {
+      "normalizer": {
+        "name_exact": {
+          "type": "custom",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      },
+      "filter": {
+        "name_edge": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 20,
+          "preserve_original": true
+        },
+        "name_grams": {
+          "type": "ngram",
+          "min_gram": 3,
+          "max_gram": 3
+        },
+        "name_phrases": {
+          "type": "shingle",
+          "min_shingle_size": 2,
+          "max_shingle_size": 3,
+          "output_unigrams": true
+        }
+      },
+      "analyzer": {
+        "name_words": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase"
+          ]
+        },
+        "name_prefix": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "name_edge"
+          ]
+        },
+        "name_trigram": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "name_grams"
+          ]
+        },
+        "name_shingle": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "name_phrases"
+          ]
+        },
+        "name_whitespace": {
+          "type": "custom",
+          "tokenizer": "whitespace",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "country": {
+        "type": "keyword"
+      },
+      "name": {
+        "type": "text",
+        "analyzer": "name_words",
+        "fields": {
+          "prefix": {
+            "type": "text",
+            "analyzer": "name_prefix",
+            "search_analyzer": "name_words"
+          },
+          "ngram": {
+            "type": "text",
+            "analyzer": "name_trigram"
+          },
+          "normalized_keyword": {
+            "type": "keyword",
+            "normalizer": "name_exact"
+          },
+          "whitespace_tokenizer": {
+            "type": "text",
+            "analyzer": "name_whitespace"
+          },
+          "word_shingle": {
+            "type": "text",
+            "analyzer": "name_shingle"
+          }
+        }
+      }
+    }
+  }
+}

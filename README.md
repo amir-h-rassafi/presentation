@@ -42,6 +42,12 @@ PDFs are written to `dist/`.
 
 ## HTML Builds
 
+For the search migration talk, the [presenter notes](presentations/search-migration/speaker-notes.md)
+include talking points and facts still needing confirmation. The
+[concise feedback reply](presentations/search-migration/feedback-response.md),
+[example mapping](presentations/search-migration/example-index.json), and
+[example queries](presentations/search-migration/example-queries.http) accompany the slides.
+
 Build the HTML version of a presentation when it has a `web/` folder:
 
 ```sh
