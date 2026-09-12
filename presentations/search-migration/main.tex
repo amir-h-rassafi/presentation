@@ -247,8 +247,8 @@
       \end{block}
 
       \begin{itemize}
-        \item $I$: index pages/postings touched
-        \item $C$: candidates after index filtering
+        \item $I$: index pages/postings touched.
+        \item $C$: candidates after index filtering.
       \end{itemize}
 
     \column{0.46\textwidth}
@@ -291,8 +291,8 @@
       \end{block}
 
       \begin{itemize}
-        \item $tf$: term frequency in this document
-        \item $idf$: rarity across all documents
+        \item $tf$: term frequency in this document.
+        \item $idf$: rarity across all documents.
       \end{itemize}
 
     \column{0.52\textwidth}
@@ -326,11 +326,6 @@
         Record: \texttt{john smith}
       \end{block}
 
-      \begin{itemize}
-        \item Same name intent, different spelling.
-        \item Shared character fragments keep the match close.
-        \item BM25 may miss or weaken it because exact terms differ.
-      \end{itemize}
 
     \column{0.48\textwidth}
       \begin{block}{BM25 wins}
@@ -339,6 +334,18 @@
         \\[0.15cm]{\scriptsize With simple word / space tokenization}
       \end{block}
 
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Search Concepts: Matching Tradeoffs: What Changes}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{itemize}
+        \item Same name intent, different spelling.
+        \item Shared character fragments keep the match close.
+        \item BM25 may miss or weaken it because exact terms differ.
+      \end{itemize}
+    \column{0.48\textwidth}
       \begin{itemize}
         \item Space-separated terms contribute to relevance.
         \item Rare terms carry more signal than common ones.
@@ -361,12 +368,6 @@
         \item Boosts decide which fields matter more.
       \end{itemize}
 
-      \begin{exampleblock}{Example: filtered + boosted}
-        \scriptsize
-        \texttt{filter: country = SE}\\
-        \texttt{match: name = acme fast}\\
-        \texttt{boost: name.raw}
-      \end{exampleblock}
 
     \column{0.48\textwidth}
       \begin{block}{Fuzziness}
@@ -379,14 +380,6 @@
         \item Prefix length and max expansions limit the cost.
       \end{itemize}
 
-      \begin{exampleblock}{Example: typo-tolerant}
-        \scriptsize
-        \texttt{query: progema fastighetts}\\
-        \texttt{fuzziness: AUTO}\\
-        \texttt{prefix length: 1}
-
-        Finds: \texttt{Progema Fastighets AB}
-      \end{exampleblock}
   \end{columns}
 
   \vspace{0.05cm}
@@ -397,6 +390,24 @@
 
 
 
+
+\begin{frame}{Search Concepts: Query Examples}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{exampleblock}{Filtered + boosted}
+        \texttt{filter: country = SE}\\
+        \texttt{match: name = acme fast}\\
+        \texttt{boost: name.raw}
+      \end{exampleblock}
+    \column{0.48\textwidth}
+      \begin{exampleblock}{Typo-tolerant}
+        \texttt{query: progema fastighetts}\\
+        \texttt{fuzziness: AUTO}\\
+        \texttt{prefix length: 1}\\[0.12cm]
+        Finds: \texttt{Progema Fastighets AB}
+      \end{exampleblock}
+  \end{columns}
+\end{frame}
 
 \section{Migration Design}
 \subsection{Moving data without overloading PostgreSQL}
