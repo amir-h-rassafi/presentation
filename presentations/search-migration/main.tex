@@ -833,19 +833,13 @@ body = {"query": {"bool": {
   \begin{center}
     \begin{tabular}{lll}
       \toprule
-      Search system & MRR (found only) & Not found \\
+      Search system & MRR (found only) & Not found(within first 20) \\
       \midrule
-      PostgreSQL \texttt{pg\_trgm} & Awaiting value & Awaiting value \\
-      Elasticsearch & Awaiting value & Awaiting value \\
+      PostgreSQL \texttt{pg\_trgm} & 0.95 & 26\% \\
+      Elasticsearch & 0.91 & 14\% \\
       \bottomrule
     \end{tabular}
   \end{center}
-  \begin{block}{Draft: evaluation details to add}
-    Query count, cutoff $k$, relevance labels, country / dataset scope, and not-found counts or rates.
-  \end{block}
-  \small MRR averages only queries with a relevant result in the top $k$; misses are reported separately. Unlike standard MRR, misses do not contribute zero here.
-  \par\smallskip
-  \scriptsize Same input query set; each system's found-only subset may differ. Placeholders are not results.
 \end{frame}
 
 \begin{frame}{Validation: Human Judgement}
