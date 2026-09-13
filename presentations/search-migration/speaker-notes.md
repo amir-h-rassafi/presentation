@@ -16,10 +16,10 @@ that still need Amir's confirmation; do not present unverified details as result
   how exceptionally late events are recovered, and how deletes are applied.
   SOURCE_TIMESTAMP + LSN + document ID must be an adequate stable cursor for the
   real source; do not assume it identifies every event uniquely without checking.
-- Freshness: Amir confirmed 15 minutes was the accepted budget. Keep it explicitly
-  labeled as a budget, not an observed delay or a completeness guarantee. Actual
-  buffer/poll/queue intervals and late-event recovery remain unconfirmed. The
-  supplied creation script sets refresh_interval to 300s; this is not a live export.
+- Freshness: do not present a fixed-duration figure. The defensible claim is that
+  the indexer read behind the newest visible CDC event using a configurable buffer.
+  Actual buffer/poll/queue intervals and late-event recovery remain unconfirmed.
+  The supplied creation script sets refresh_interval to 300s; this is separate.
 - Evaluation: actual PostgreSQL and Elasticsearch MRR@k values, k, query count,
   relevance labels, test snapshot, and date. No paired MRR results were supplied.
   The worked 0.50 example is educational, not a measured migration result.
@@ -37,14 +37,14 @@ that still need Amir's confirmation; do not present unverified details as result
   reflect the historical decision. It no longer implies a scored benchmark.
 - Timing: the original talk date remains May 2026. Confirm if the event date changed.
 
-## Timestamp lag
+## Buffered CDC read
 
 “We leave a small buffer before reading the newest CDC window. Events can still
 be in flight even when later timestamps are already visible. This trades freshness
 for a lower risk of skipping late arrivals.”
 
-Example: a five-minute buffer cannot protect against an event delayed ten minutes.
-A fixed buffer is not a completeness guarantee. Explain the actual watermark,
+No duration is claimed. A fixed buffer cannot protect against every delayed event
+and is not a completeness guarantee. Explain the actual watermark,
 overlap/reconciliation, or late-event recovery mechanism only after confirming it.
 Do not say the buffer alone prevents lost rows.
 
@@ -149,8 +149,8 @@ can affect ranking; it does not guarantee a particular company will rank first.
 ## Freshness and architecture
 
 “PostgreSQL remains the source of truth. Company search uses asynchronously
-updated, country-specific Elasticsearch indexes. We accepted a fifteen-minute
-freshness budget, which gave the indexing pipeline room for buffering.”
+updated, country-specific Elasticsearch indexes. The indexer reads behind the
+newest visible CDC event to reduce the risk from changes still in flight.”
 
 The diagrams describe Datastream events in an append-only BigQuery history, not
 BigQuery merge-mode state application. Source-to-search delay can include CDC
@@ -168,9 +168,12 @@ standard MRR (misses contribute zero), not the conditional result-table denomina
 “The first relevant result at rank 1 scores 1, at rank 2 scores one half, and absent
 from the top 20 scores zero. Average across queries: this example gives MRR@20 0.50.”
 
-Validation started with generated query variations using NLPAUG, then historical
-customer-query replay. The precise augmenter configuration is not yet supplied;
-do not claim specific augmentation operators or rates.
+Validation started with generated variations. NLPAUG supports KeyboardAug and
+OcrAug substitutions; random character insert/substitute/swap/delete; and random
+word swap/crop/delete plus word splitting. We also tested spacing/casing changes.
+Keyword slicing and query truncation (partial names or dropped trailing words) were
+our search-specific generation, not described as an NLPAUG augmenter. Exact
+augmentation rates are not yet supplied.
 
 For backtesting, only the customer queries were taken from history, not the companies
 customers selected in the funnel. Each query was run against both setups, and both

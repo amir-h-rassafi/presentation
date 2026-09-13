@@ -400,43 +400,35 @@ GET companies/_search
       {\small\textcolor{MutedText}{BM25 scores matches; fuzziness handles term spelling differences.}}
   \end{columns}
   \vspace{0.2cm}
-  \begin{block}{Migration implication}
-    There is no equivalent 0.3 BM25 cutoff. We tune matching and ranking separately, then validate the results.
-  \end{block}
 \end{frame}
 
-\begin{frame}{Search Concepts: Query Fuzziness}
-  \scriptsize
+\begin{frame}{Search Concepts: Query Shape and Fuzziness}
+  \small
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
-      \begin{block}{Query shape}
-        \texttt{match} analyzes text into terms and BM25 scores the matching documents.
+      \begin{block}{Boolean structure}
+        Six scoring clauses under \texttt{bool.should}.
       \end{block}
-
       \begin{itemize}
-        \item Filters restrict matches without adding to the score.
-        \item Text clauses score the remaining candidates.
-        \item Boosts decide which fields matter more.
+        \item \texttt{minimum\_should\_match: 1}.
+        \item No \texttt{must} or \texttt{filter} clause.
+        \item Scores add when multiple clauses match.
       \end{itemize}
-
-
     \column{0.48\textwidth}
-      \begin{block}{Fuzziness}
-        \texttt{fuzziness: AUTO} expands terms to nearby spellings.
+      \begin{block}{Two fuzzy clauses}
+        Fuzziness is applied only where needed.
       \end{block}
-
       \begin{itemize}
-        \item Better recall for typos and name variants.
-        \item More expansions increase query work.
-        \item Prefix length and max expansions limit the cost.
+        \item \texttt{name}: \texttt{AUTO} fuzziness.
+        \item \texttt{name.prefix}: fuzziness \texttt{1}.
+        \item No explicit \texttt{prefix\_length} or \texttt{max\_expansions} override.
       \end{itemize}
-
   \end{columns}
-
-  \vspace{0.05cm}
-  \begin{block}{Latency tradeoff}
-    Target fuzziness where needed: broad matching can raise p99.
+  \vspace{0.15cm}
+  \begin{block}{Four non-fuzzy signals}
+    Normalized exact term, standard prefix, whitespace-tokenized text, and word shingles.
   \end{block}
+  {\scriptsize\textcolor{MutedText}{Clause weights are ranking fine-tuning, so they are intentionally omitted here.}}
 \end{frame}
 
 
@@ -563,10 +555,12 @@ GET companies/_search
   Indexer partitions (application shards) are separate from Elasticsearch index shards.
 \end{frame}
 
-\begin{frame}{Migration Design: Timestamp Lag}
+\begin{frame}{Migration Design: Buffered CDC Read}
   \centering
   \vspace{-0.05cm}
   \resizebox{0.84\textwidth}{!}{\input{diagrams/04-timestamp-lag-guardrail.tex}}
+  \par\smallskip
+  {\small\textcolor{MutedText}{The buffer reduces late-arrival risk; it is not a freshness SLA or a completeness guarantee.}}
 \end{frame}
 
 \begin{frame}{Migration Design: Checkpointing}
@@ -785,16 +779,18 @@ body = {"query": {"bool": {
 
 \begin{frame}{Validation: Generated Queries with NLPAUG}
   \hypertarget{sec:validation}{}
-  \begin{block}{First: generated test cases}
-    Use \href{https://github.com/makcedward/nlpaug}{\underline{NLPAUG}} to create variations of company-name queries and compare search behavior across both setups.
-  \end{block}
+  Use \href{https://github.com/makcedward/nlpaug}{\underline{NLPAUG}} and search-specific transformations to generate:
   \begin{itemize}
-    \item Exercise noisy input beyond exact company names.
-    \item Compare how both search setups handle the generated queries.
+    \item Keyboard-adjacent and OCR-like substitutions.
+    \item Character insertion, substitution, swapping, and deletion.
+    \item Word swapping, cropping, deletion, and splitting.
+    \item Spacing and casing variations.
+    \item Keyword slicing and query truncation: partial names or dropped trailing words.
   \end{itemize}
-  \begin{block}{Then: historical queries and expert votes}
-    Replay customer queries and ask experts to compare both top-20 result lists.
-  \end{block}
+  \vspace{0.1cm}
+  \small Compare every generated query across both search setups; then validate historical queries through expert review of both top-20 lists.
+  \par\smallskip
+  {\scriptsize\textcolor{MutedText}{NLPAUG provides the noise augmenters; keyword slicing/query truncation is our search-specific test generation.}}
 \end{frame}
 
 \begin{frame}{Validation: What MRR Measures}
@@ -829,7 +825,7 @@ body = {"query": {"bool": {
   \end{block}
 \end{frame}
 
-\begin{frame}{Validation: MRR Results}
+\begin{frame}{Validation: MRR Results(Generated Test Cases)}
   \begin{center}
     \begin{tabular}{lll}
       \toprule

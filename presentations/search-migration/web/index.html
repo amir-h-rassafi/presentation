@@ -258,6 +258,15 @@ LIMIT 20;</code></pre></div>
     </section>
 
     <section>
+      <h2>Query Shape and Fuzziness</h2>
+      <div class="two-col small">
+        <div class="card"><h3>Boolean structure</h3><p>Six scoring clauses under <code>bool.should</code>.</p><ul><li><code>minimum_should_match: 1</code></li><li>No <code>must</code> or <code>filter</code></li><li>Matching clause scores add</li></ul></div>
+        <div class="card teal"><h3>Two fuzzy clauses</h3><ul><li><code>name</code>: <code>AUTO</code> fuzziness</li><li><code>name.prefix</code>: fuzziness <code>1</code></li><li>No explicit <code>prefix_length</code> or <code>max_expansions</code> override</li></ul></div>
+      </div>
+      <p class="small">Non-fuzzy signals: normalized exact term, standard prefix, whitespace-tokenized text, and word shingles.</p>
+      <p class="small">Clause weights are ranking fine-tuning, so they are intentionally omitted here.</p>
+    </section>
+    <section>
       <h2>Query Shape</h2>
       <p>Six <code>should</code> clauses combine exact, prefix, fuzzy prefix, fuzzy text, whitespace, and shingle signals.</p>
       <ul>
@@ -350,14 +359,14 @@ flowchart TB
     </section>
 
     <section>
-      <h2>Timestamp Lag</h2>
+      <h2>Buffered CDC Read</h2>
       <ul>
         <li>Read behind the newest CDC window.</li>
         <li>Leave a buffer for events still in flight.</li>
-        <li>Trade freshness for reduced late-arrival risk.</li>
+        <li>The buffer duration is an operational setting, not a stated SLA.</li>
       </ul>
       <div class="card orange">A fixed buffer does not guarantee completeness.</div>
-      <aside class="notes">A five-minute buffer does not protect against an event delayed ten minutes. Confirm the actual late-event recovery mechanism before claiming completeness.</aside>
+      <aside class="notes">The buffer reduces late-arrival risk but cannot protect against every delayed event. Do not claim completeness without a separate late-event recovery mechanism.</aside>
     </section>
 
     <section>
@@ -499,9 +508,16 @@ flowchart LR
     </section>
     <section>
       <h2>Generated Queries with NLPAUG</h2>
-      <p>First, use <a href="https://github.com/makcedward/nlpaug">NLPAUG</a> to create variations of company-name queries and compare both search setups.</p>
-      <ul><li>Exercise noisy input beyond exact company names.</li><li>Compare search behavior on the generated queries.</li></ul>
-      <p>Then replay historical customer queries and ask experts to compare both top-20 result lists.</p>
+      <p>Use <a href="https://github.com/makcedward/nlpaug">NLPAUG</a> and search-specific transformations to generate:</p>
+      <ul>
+        <li>Keyboard-adjacent and OCR-like substitutions.</li>
+        <li>Character insertion, substitution, swapping, and deletion.</li>
+        <li>Word swapping, cropping, deletion, and splitting.</li>
+        <li>Spacing and casing variations.</li>
+        <li>Keyword slicing and query truncation: partial names or dropped trailing words.</li>
+      </ul>
+      <p class="small">Compare every generated query across both setups; then validate historical queries through expert review of both top-20 lists.</p>
+      <p class="small">NLPAUG provides the noise augmenters; keyword slicing/query truncation is our search-specific test generation.</p>
     </section>
     <section>
       <h2>What MRR Measures</h2>

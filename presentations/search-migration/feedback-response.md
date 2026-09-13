@@ -19,7 +19,7 @@ pg_trgm, not pgvector.
 13. Adjacent word tokens, e.g. “progema fastighets”.
 14. Fixed.
 15. Found-only MRR and Not found columns prepared; figures pending.
-16. Fifteen minutes was the accepted freshness budget, allowing CDC/indexing buffers.
+16. Fixed duration removed; the slide now explains the buffered CDC read without presenting it as an SLA or completeness guarantee.
 17. Fixed—used the existing readable latency comparison.
 18. Lessons slide removed.
 19. PostgreSQL remains the source of truth; Elasticsearch serves country-specific search indexes.
