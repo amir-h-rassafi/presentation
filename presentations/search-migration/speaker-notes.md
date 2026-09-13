@@ -5,19 +5,21 @@ that still need Amir's confirmation; do not present unverified details as result
 
 ## Confirm before presenting
 
-- Deployment: exact hosting product and deployment type (Elastic Cloud Hosted,
-  Serverless, or self-hosted). The supplied deck says 3 data nodes, 4 cores / 8 GB
-  each, 3 primary shards, and one replica per primary, but does not name hosting.
-- Indexer: actual partition count, worker-process count, ownership/lease mechanism,
-  and whether one process hosts multiple partition loops. Earlier PDF and HTML
-  diagrams disagreed; current slides use a conceptual N without inventing a count.
+- Deployment: Elastic Cloud Hosted, confirmed by Amir, chosen for greater control
+  over index settings, shards, and replicas. Do not claim Serverless settings are immutable.
+- Indexer: Amir confirmed one application partition/shard per worker (1:1).
+  The total number was omitted. Ownership enforcement still needs confirmation.
+  Elasticsearch primary shards are distinct from these application partitions.
+  The supplied default-country script sets 3 primaries per index and 1 replica per
+  primary outside DEV (0 in DEV). DE/FR have separate scripts; NZ is excluded.
 - CDC: confirm append-only BigQuery mode, the actual cursor fields and ordering,
   how exceptionally late events are recovered, and how deletes are applied.
   SOURCE_TIMESTAMP + LSN + document ID must be an adequate stable cursor for the
   real source; do not assume it identifies every event uniquely without checking.
-- Freshness: was 15 minutes an observed figure, an acceptance budget, or both?
-  What were the buffer, polling, queue, and refresh intervals? Was lag monitored?
-  The slides describe accepted asynchronous freshness, not a guaranteed bound.
+- Freshness: Amir confirmed 15 minutes was the accepted budget. Keep it explicitly
+  labeled as a budget, not an observed delay or a completeness guarantee. Actual
+  buffer/poll/queue intervals and late-event recovery remain unconfirmed. The
+  supplied creation script sets refresh_interval to 300s; this is not a live export.
 - Evaluation: actual PostgreSQL and Elasticsearch MRR@k values, k, query count,
   relevance labels, test snapshot, and date. No paired MRR results were supplied.
   The worked 0.50 example is educational, not a measured migration result.
@@ -61,13 +63,17 @@ Permanent failures need explicit handling; do not silently checkpoint past them.
 “One partition has one active owner and one ordered processing loop: read, fetch,
 write, check, commit. Different partitions run independently.”
 
-A partition is an application concept, not an Elasticsearch primary shard. A worker
-process can host multiple loops; the diagram does not assert production counts.
+A partition is an application concept, not an Elasticsearch primary shard. Amir
+confirmed a 1:1 partition-to-worker assignment; the total count is still missing.
 Stable IDs make repeated document replacement avoid duplicates. Ordered processing
 or version checks are still needed to prevent stale overwrites and stale deletes.
 Confirm ownership enforcement and source sequence handling before asserting safety.
 
 ## Actual query supplied by Amir
+
+Each country has its own index because languages and settings differ. The overall
+analyzer approach is similar; this does not mean one language per country or identical
+configuration everywhere. The generic companies/demo index name is illustrative.
 
 The slides and request example preserve all six clauses and their original order:
 normalized_keyword (term, boost 300), prefix (match, 40), prefix (fuzziness "1",
@@ -81,17 +87,54 @@ outer minimum_should_match requires one clause, not all words. No country filter
 must clause, AND operator, prefix_length, or max_expansions override is added.
 
 No separate n-gram field is queried here. The earlier trigram query and the extra
-name.ngram field in the demo mapping remain educational. Actual analyzer settings
-have not been supplied: the demonstration's lowercase normalizer, tokenizers,
-prefix lengths, and shingle settings are illustrative. The production query alone
-cannot establish their configuration or ranking outcomes.
+name.ngram field in the demo mapping remain educational. Amir subsequently supplied
+the default creation script: production mapping excerpts now use its analyzer names.
+The standalone example-index.json and example-queries.http remain illustrative demo
+assets, not production exports. The mapped production name.character_ngram field
+is absent from the supplied six-clause query.
+
+## Supplied default index script: configuration and caveats
+
+- Country alias business_identity_{country} points to business_identity_{country}_1.
+- Managed by Elastic; the script does not reveal node count, CPU, or RAM.
+- Three primaries per default country index; one replica per primary outside DEV,
+  zero in DEV. These do not establish indexer-worker count or checkpoint-index settings.
+- Refresh is configured to 300s. Indexing acknowledgement is not search visibility;
+  explicit refreshes or later changes to settings can alter observed timing.
+- Prefix uses keyword tokenization, lowercase, ASCII folding, edge n-grams 3–20;
+  search uses keyword_normalized. This is the start of the entire name, not each word.
+  No 1–2-character prefix tokens are emitted; inputs beyond 20 characters are not
+  truncated by the search analyzer. Other query clauses may still match.
+- Main text uses standard tokenization; whitespace text adds a keyword-marker
+  filter before stemming. Both configure country-specific stop and stem filters.
+- Character n-grams use keyword tokenization and exactly 3 characters. Shingles
+  use whitespace tokenization, 2–3-word shingles, and output_unigrams=true.
+- sync_checkpoints maps last_business_identity_id, last_change_sequence_number,
+  last_source_timestamp, source_table, status, target_index, and updated_at. Mapping
+  alone does not prove cursor ordering, worker ownership, or exactly-once behavior.
+
+Code-review caveats (not silently corrected; no live cluster contacted):
+
+1. stopwords is generated as _english rather than the documented _english_
+   (and likewise for other languages). Do not assume the intended stop list loads.
+2. light_{language} is not universally supported: light_danish and light_dutch
+   are not listed stemmer algorithms. Select a supported algorithm per language.
+3. keyword_marker follows lowercase but protected terms are mostly mixed/uppercase,
+   with ignore_case omitted (default false). Protection may therefore not apply as
+   intended. The marker is only in the whitespace analyzer, not the main text analyzer.
+
+References: [stop filter](https://www.elastic.co/docs/reference/text-analysis/analysis-stop-tokenfilter),
+[stemmer algorithms](https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter),
+[keyword marker](https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter),
+[refresh](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/refresh-parameter).
 
 [Boolean query scoring](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query)
 
 ## Prefix and shingles
 
-“A separate prefix field gives explicit control over prefix lengths and analysis,
-with two separately scored clauses, one of them fuzzy.”
+“Analyzer issues with punctuation, such as a-m versus a m, motivated separate
+representations. The prefix field supplies its own matching signal, with and without
+fuzziness.”
 
 search_as_you_type is a valid alternative: it supports configurable analysis and
 creates shingle/prefix subfields automatically. Punctuation or long names alone
@@ -105,9 +148,9 @@ can affect ranking; it does not guarantee a particular company will rank first.
 
 ## Freshness and architecture
 
-“PostgreSQL remains the source of truth. Company search uses an asynchronously
-updated Elasticsearch index. Roughly fifteen-minute freshness was acceptable for
-this use case.”
+“PostgreSQL remains the source of truth. Company search uses asynchronously
+updated, country-specific Elasticsearch indexes. We accepted a fifteen-minute
+freshness budget, which gave the indexing pipeline room for buffering.”
 
 The diagrams describe Datastream events in an append-only BigQuery history, not
 BigQuery merge-mode state application. Source-to-search delay can include CDC
@@ -117,11 +160,27 @@ Show the application still reading/writing transactional data in PostgreSQL.
 
 ## MRR and results
 
+The result table reports MRR conditional on finding a relevant result within top k;
+misses are excluded from that average and reported separately as Not found. Each
+engine may have a different found-only subset. The definition slide illustrates
+standard MRR (misses contribute zero), not the conditional result-table denominator.
+
 “The first relevant result at rank 1 scores 1, at rank 2 scores one half, and absent
 from the top 20 scores zero. Average across queries: this example gives MRR@20 0.50.”
 
-Use the same query set, relevance labels, and cutoff for both engines. Historical
-clicks/selections can reflect position bias. The displayed human preference result
+Validation started with generated query variations using NLPAUG, then historical
+customer-query replay. The precise augmenter configuration is not yet supplied;
+do not claim specific augmentation operators or rates.
+
+For backtesting, only the customer queries were taken from history, not the companies
+customers selected in the funnel. Each query was run against both setups, and both
+ordered top-20 lists were shared with a few domain experts. Experts voted for the
+result list they expected/wanted to see. Blinding, randomization, reviewer count,
+and vote aggregation are not yet confirmed. List preference does not provide the
+per-result relevance labels needed to calculate MRR.
+
+Use the same query set, relevance labels, and cutoff for any paired MRR evaluation.
+The displayed human preference result
 is separate from MRR: 50.6 + 29.4 = 80% preferred or tied. Do not relabel it as MRR
 or ranking parity across the whole corpus. Add paired measured MRR only when available.
 
@@ -141,8 +200,60 @@ matches. The trigram analyzer emits no tokens for words shorter than three
 characters; the other fields cover different signals. Standard tokenization is
 illustrative: inspect real multilingual names with _analyze before adopting it.
 
+## Deployment research: do not overstate the restriction
+
+Checked official Elasticsearch documentation. Serverless supports a subset of
+settings and has an update-settings API: "settings cannot be updated in place" is
+too broad. Static versus dynamic settings and analyzer definitions versus field
+mappings are different things. On standard Elasticsearch, adding an analyzer to an
+existing index uses a close/define/reopen workflow. Changing an existing field's
+index-time analyzer through update-mapping is not supported; already indexed
+terms are not retroactively rewritten. Reindexing may therefore still be required
+on a managed cluster. Verify the exact alternative, setting, version, and operation
+before presenting this as the reason for the deployment choice.
+
+## Punctuation example
+
+Tokenizer-only behavior, derived from official tokenization rules:
+standard: a-m -> [a, m], a m -> [a, m]
+whitespace: a-m -> [a-m], a m -> [a, m]
+keyword: a-m -> [a-m], a m -> [a m]
+
+The illustrative normalized keyword uses lowercase only, so it retains punctuation
+and spacing. A production char filter or other normalization may erase that
+distinction. The supplied OR-style query can match both forms through other clauses;
+preserving a field representation does not guarantee different final results.
+search_as_you_type accepts custom analysis, so this example alone does not establish
+that the alternative could not work. No live production analyzer was tested.
+Tokenizer-only _analyze requests have been added to the examples.
+
 ## References
 
+- [Supported Serverless index settings](https://www.elastic.co/docs/reference/elasticsearch/index-settings/serverless)
+- [Dynamic and static index settings](https://www.elastic.co/docs/reference/elasticsearch/index-settings)
+- [Serverless update-settings API](https://www.elastic.co/docs/api/doc/elasticsearch-serverless/operation/operation-indices-put-settings)
+- [Existing field analyzer restrictions](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/analyzer)
+- [Standard tokenizer](https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer)
+- [Whitespace tokenizer](https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer)
+- [Keyword tokenizer](https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer)
+
+- Selection scope: 11 initial options were filtered to three general-purpose
+  full-text/fuzzy-search candidates. The restored comparison table describes this
+  shortlist, not the entire initial pool. Amir supplied the initial list:
+  Typesense, Elasticsearch, Meilisearch, Faiss, pgvector, Weaviate, Redis, Milvus,
+  Qdrant, Pinecone, and Annoy.
+  Evaluation covered clustering, full-text search, fuzzy search, data-size handling,
+  ease of use, future vector search, community, deployment, PostgreSQL integration
+  and ease of building a replica, typical use cases, and implementation languages.
+  PostgreSQL integration was a criterion, not a claim that all tools offer native
+  replication. Implementation language was context, not a performance benchmark.
+  Its capability summary was checked in September 2026; it is not evidence that
+  every feature was available in the evaluated versions at the time of selection.
+- [Typesense HA and full-dataset replication](https://typesense.org/docs/guide/high-availability.html)
+- [Typesense search weights and typo controls](https://typesense.org/docs/30.0/api/search.html)
+- [Meilisearch Enterprise sharding and replication](https://www.meilisearch.com/docs/resources/self_hosting/sharding/overview)
+- [Meilisearch ranking rules](https://www.meilisearch.com/docs/resources/internals/ranking)
+- [Elasticsearch shard allocation](https://www.elastic.co/docs/deploy-manage/distributed-architecture/shard-allocation-relocation-recovery)
 - [PostgreSQL trigrams and GiST/GIN query differences](https://www.postgresql.org/docs/current/pgtrgm.html)
 - [Elasticsearch multi-fields](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/multi-fields)
 - [Search as you type](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/search-as-you-type)

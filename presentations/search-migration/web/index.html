@@ -82,6 +82,8 @@
     .latency-chart svg { display: block; width: 100%; max-height: 550px; }
     .reveal .notes { display: none; }
     .reveal pre.production-query { font-size: .50em; }
+    .reveal table.candidate-comparison { font-size: .63em; }
+    .investigation { font-size: .74em; }
   </style>
 </head>
 <body>
@@ -123,14 +125,36 @@
     </section>
 
     <section>
-      <h2>Why Elasticsearch?</h2>
-      <p>Shortlist: Typesense, Meilisearch, and Elasticsearch.</p>
-      <ul>
-        <li>Scale: partition the index and grow beyond one node.</li>
-        <li>Availability: replicas and established cluster operations.</li>
-        <li>Search control: analyzers, fields, and ranking signals.</li>
-      </ul>
-      <p class="small">Requirements comparison; not a three-engine latency benchmark.</p>
+      <h2>Tool Investigation</h2>
+      <div class="two-col investigation">
+        <div class="card"><h3>11 initial options</h3>
+          <p>Typesense · Elasticsearch<br>Meilisearch · Faiss<br>pgvector · Weaviate<br>Redis · Milvus<br>Qdrant · Pinecone<br>Annoy</p>
+        </div>
+        <div class="card teal"><h3>Evaluation dimensions</h3>
+          <ul>
+            <li><strong>Search:</strong> full text, fuzzy, use-case fit.</li>
+            <li><strong>Scale:</strong> clustering, data size.</li>
+            <li><strong>Operations:</strong> ease of use, deployment.</li>
+            <li><strong>PostgreSQL:</strong> integration, replica setup.</li>
+            <li><strong>Ecosystem:</strong> community, implementation languages.</li>
+            <li><strong>Future:</strong> vector-search support.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="small"><strong>Shortlist after filtering:</strong> Typesense, Meilisearch, and Elasticsearch—closest fit to immediate full-text and fuzzy company-name search.</p>
+    </section>
+    <section>
+      <h2>Shortlisted Candidate Comparison</h2>
+      <table class="candidate-comparison">
+        <thead><tr><th>Factor</th><th>Typesense</th><th>Meilisearch</th><th>Elasticsearch</th></tr></thead>
+        <tbody>
+          <tr><td>Availability</td><td>Raft-based HA cluster</td><td>Replication in Enterprise Edition</td><td>Primary shards and replicas</td></tr>
+          <tr><td>Scale model</td><td>Full dataset on each HA node</td><td>Sharding across instances in Enterprise Edition</td><td>Index distributed across primary shards</td></tr>
+          <tr><td>Search control</td><td>Field weights, prefix and typo settings</td><td>Ordered ranking rules and typo settings</td><td>Custom analyzers, multi-fields, query boosts</td></tr>
+        </tbody>
+      </table>
+      <p>Typesense and Meilisearch were strong fits. Existing Elasticsearch expertise and limited benchmark evidence for future scale tipped our decision.</p>
+      <p class="small">Capabilities checked September 2026; sources in presenter notes. Requirements comparison, not a three-engine latency benchmark.</p>
     </section>
     <section>
       <h2>Trigram Similarity</h2>
@@ -147,6 +171,7 @@
       <p><code>serch → {__s, _se, ser, erc, rch, ch_}</code></p>
       <p class="small">Underscores represent PostgreSQL's padding spaces.</p>
       <div class="card teal">4 shared fragments / 9 distinct fragments ≈ 0.44 similarity.</div>
+      <p class="small">Default <code>pg_trgm.similarity_threshold</code>: 0.3 for the <code>%</code> filter; higher scores match, lower scores are excluded. Configurable per session.</p>
     </section>
     <section>
       <h2>Trigram Queries</h2>
@@ -178,6 +203,44 @@ LIMIT 20;</code></pre></div>
       <div class="card orange"><strong>Key distinction:</strong> <code>pg_trgm</code> is similarity. BM25 is relevance scoring over tokens.</div>
     </section>
 
+    <section>
+      <h2>Search Concepts: Matching Tradeoffs</h2>
+      <div class="two-col small">
+        <div class="card"><strong>Similarity wins</strong><p><code>jon smyth</code> → <code>john smith</code></p></div>
+        <div class="card teal"><strong>BM25 wins</strong><p><code>senior backend engineer</code> → <code>backend engineer with search experience</code></p><p>With simple word / space tokenization.</p></div>
+      </div>
+      <h3 style="font-size: .8em;">Length-sensitive similarity: one- and two-character input</h3>
+      <div class="two-col small">
+        <table>
+          <thead><tr><th>Candidate</th><th>Query a</th><th>Query ab</th></tr></thead>
+          <tbody>
+            <tr><td>ab</td><td style="color: #b45309;">0.25</td><td style="color: #2a7f78;">1.00</td></tr>
+            <tr><td>abc</td><td style="color: #b45309;">0.20</td><td style="color: #2a7f78;">0.40</td></tr>
+            <tr><td>abcd</td><td style="color: #b45309;">0.17</td><td style="color: #2a7f78;">0.33</td></tr>
+            <tr><td>abcde</td><td style="color: #b45309;">0.14</td><td style="color: #b45309;">0.29</td></tr>
+          </tbody>
+        </table>
+        <div><p>Every query is a perfect prefix. Additional candidate trigrams dilute whole-string similarity.</p><p><span style="color: #2a7f78;">Match: ≥ 0.3</span><br><span style="color: #b45309;">No match: &lt; 0.3</span></p><p>Controlled examples; scores rounded.</p></div>
+      </div>
+    </section>
+    <section>
+      <h2>From Similarity to Relevance</h2>
+      <div class="two-col small">
+        <div class="card">
+          <h3>PostgreSQL: character overlap</h3>
+          <p>How similar are these two names?</p>
+          <ol><li>Compare their trigram sets.</li><li>Keep names above the similarity cutoff.</li><li>Order by similarity.</li></ol>
+          <p>Typos can still share many character fragments.</p>
+        </div>
+        <div class="card teal">
+          <h3>Elasticsearch: analyzed terms</h3>
+          <p>Which matching names are most relevant?</p>
+          <ol><li>Analyze names and query text into terms.</li><li>Match terms; optionally expand for typos.</li><li>Rank text matches with BM25 and boosts.</li></ol>
+          <p>BM25 scores matches; fuzziness handles term spelling differences.</p>
+        </div>
+      </div>
+      <p class="small">There is no equivalent 0.3 BM25 cutoff. We tune matching and ranking separately, then validate the results.</p>
+    </section>
     <section>
       <h2>Tokenization Changes The Score</h2>
       <div class="two-col">
@@ -263,23 +326,27 @@ flowchart LR
       <h2>Indexer Partitions</h2>
       <div class="diagram-wrap"><pre class="mermaid">
 flowchart TB
-  R["hash(entity_unique_id) % N"] --> P0["Partition 0: owned loop"]
-  R --> P1["Partition 1: owned loop"]
-  R --> PN["Partition N-1: owned loop"]
+  R["hash(entity_unique_id) % N"] --> P0["Partition 0: Worker 0"]
+  R --> P1["Partition 1: Worker 1"]
+  R --> PN["Partition N-1: Worker N-1"]
   P0 --> ES[(Elasticsearch)]
   P1 --> ES
   PN --> ES
       </pre></div>
-      <p class="small">One active owner per partition. A process can host multiple loops. N is independent of Elasticsearch's shard count.</p>
+      <p class="small">Our indexer used one worker per partition (1:1). These application shards are separate from Elasticsearch index shards.</p>
     </section>
     <section>
-      <h2>Elasticsearch Cluster</h2>
+      <h2>Elasticsearch Deployment</h2>
       <ul>
-        <li>3 data nodes, each 4 cores / 8 GB RAM.</li>
-        <li>3 primary shards, 1 replica each: 6 shard copies.</li>
+        <li>Deployment: managed by Elastic.</li>
+        <li>Default country index: 3 primary shards.</li>
+        <li>Replicas per primary: 1 in STAGE/PROD; 0 in DEV.</li>
+        <li>Refresh interval: 300 seconds (5 minutes).</li>
         <li>Elasticsearch handles allocation and request routing.</li>
         <li>Writes go through primaries and replicate; reads can use either copy.</li>
       </ul>
+      <p class="small">Index settings from the supplied default script, not node count, CPU, RAM, or indexer-worker count.</p>
+      <p class="small">We chose Elastic Cloud Hosted for greater control over index settings, shards, and replicas.</p>
     </section>
 
     <section>
@@ -316,16 +383,25 @@ flowchart LR
         <li>Reuse PostgreSQL row IDs to avoid duplicate documents.</li>
         <li>Ordering or version checks must also prevent stale overwrites and deletes.</li>
       </ul>
-      <aside class="notes">One active owner is the processing model, not a claim about process counts. Confirm leases and source ordering. Stable IDs alone are insufficient for safe out-of-order replay.</aside>
+      <aside class="notes">Amir confirmed a 1:1 indexer partition-to-worker assignment; the total count is still missing. Confirm leases and source ordering. Stable IDs alone are insufficient for safe out-of-order replay.</aside>
     </section>
 
+    <section>
+      <h2>Country-Specific Indexes</h2>
+      <ul>
+        <li>A separate search index for each indexed country.</li>
+        <li>Different languages and country-specific settings.</li>
+        <li>A similar multi-field analyzer approach across countries.</li>
+      </ul>
+      <p class="small"><code>business_identity_gb</code> → <code>business_identity_gb_1</code>. Country aliases point to versioned indexes. DE/FR use separate scripts; NZ is not indexed by this setup.</p>
+    </section>
     <section>
       <h2>Elasticsearch Multi-fields</h2>
       <p>One source name, several indexed forms.</p>
       <table><thead><tr><th>Field</th><th>Role</th></tr></thead><tbody>
         <tr><td>name</td><td>Analyzed words, BM25</td></tr>
         <tr><td>name.normalized_keyword</td><td>Normalized exact match</td></tr>
-        <tr><td>name.prefix</td><td>Partial word input</td></tr>
+        <tr><td>name.prefix</td><td>Whole-name prefixes, 3–20 characters</td></tr>
         <tr><td>name.whitespace_tokenizer</td><td>Whitespace token boundaries</td></tr>
         <tr><td>name.word_shingle</td><td>Adjacent word sequences</td></tr>
       </tbody></table>
@@ -333,39 +409,53 @@ flowchart LR
     <section>
       <h2>Mapping: Analyzer Assignments</h2>
       <pre><code>"name": {
-  "type": "text", "analyzer": "name_words",
+  "type": "text", "analyzer": "language_text_standard",
   "fields": {
-    "normalized_keyword": { "type": "keyword", "normalizer": "name_exact" },
-    "prefix": { "type": "text", "analyzer": "name_prefix",
-                "search_analyzer": "name_words" },
-    "whitespace_tokenizer": { "type": "text", "analyzer": "name_whitespace" },
-    "word_shingle": { "type": "text", "analyzer": "name_shingle" }
+    "normalized_keyword": { "type": "keyword", "normalizer": "language_normalizer" },
+    "prefix": { "type": "text", "analyzer": "prefix_analyzer",
+                "search_analyzer": "keyword_normalized" },
+    "whitespace_tokenizer": { "type": "text", "analyzer": "language_text_whitespace" },
+    "word_shingle": { "type": "text", "analyzer": "word_shingle_analyzer" }
   }
 }</code></pre>
-      <p class="small">Actual query field names; analyzer definitions remain illustrative. Complete settings accompany the slides.</p>
+      <p class="small">Excerpt from the supplied default mapping; other subfields omitted. Lowercase + ASCII folding; country-specific text analysis and stemming.</p>
     </section>
 
     <section>
-      <h2>Analyzer Examples</h2>
-      <table>
-        <thead><tr><th>Analyzer</th><th>Example</th><th>Why it matters</th></tr></thead>
-        <tbody>
-          <tr><td>Prefix</td><td><code>pr, pro, prog, proge...</code></td><td>Beginning-of-name search</td></tr>
-          <tr><td>Whitespace</td><td><code>acme-fastighets, ab</code></td><td>Whitespace-only token boundaries</td></tr>
-          <tr><td>Shingle</td><td><code>progema fastighets</code></td><td>Longer multi-word names</td></tr>
-        </tbody>
-      </table>
+      <h2>Analyzer Choices</h2>
+      <ul class="small">
+        <li>Normalize case and accents: <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-lowercase-tokenfilter">lowercase</a> + <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-asciifolding-tokenfilter">ASCII folding</a>.</li>
+        <li>Main text: <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer">standard tokenizer</a>, country-specific analysis and <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter">stemming</a>.</li>
+        <li>Prefix: <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer">keyword tokenizer</a>, <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-edgengram-tokenfilter">edge n-grams</a> 3–20; keyword query analysis.</li>
+        <li><a href="https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer">Whitespace</a>: separate boundaries and a <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter">legal-suffix protection filter</a>.</li>
+        <li><a href="https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter">Shingles</a>: whitespace tokens, 2–3 words, plus individual words.</li>
+      </ul>
+      <div class="card small">
+        <strong>Why custom prefix rather than search-as-you-type?</strong>
+        <p>Our custom analyzer keeps whole-name prefixes, preserving <code>a-m</code> versus <code>a m</code>, with explicit 3–20-character limits and separate query boosts.</p>
+        <p><a href="https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/search-as-you-type">search_as_you_type</a> builds shingle/prefix subfields automatically and also supports custom analysis; we chose explicit control over these representations.</p>
+      </div>
+      <p class="small">Components link to Elastic documentation; analyzer names and their combination are ours.</p>
     </section>
 
     <section>
       <h2>Prefix Design Choice</h2>
       <ul>
-        <li>Explicit prefix lengths and analyzer settings.</li>
-        <li>A separately weighted prefix query clause.</li>
-        <li>Queried both with and without fuzziness, alongside the other name signals.</li>
+        <li>Analyzer behavior on names such as <code>a-m</code> and <code>a m</code> drove the design.</li>
+        <li>Separate fields retain different token boundaries and signals.</li>
+        <li>Prefix clauses have their own weights, with and without fuzziness.</li>
       </ul>
-      <div class="card">search_as_you_type is a valid alternative with configurable analysis and built-in prefix/shingle subfields.</div>
-      <p class="small">Long names and punctuation alone do not rule it out.</p>
+      <p class="small">search_as_you_type also supports custom analysis. This explains our multi-field choice, not a universal limitation of the alternative.</p>
+    </section>
+    <section>
+      <h2>Punctuation Changes Tokens</h2>
+      <table><thead><tr><th>Tokenizer</th><th>a-m</th><th>a m</th></tr></thead><tbody>
+        <tr><td>Standard</td><td>[a, m]</td><td>[a, m]</td></tr>
+        <tr><td>Whitespace</td><td>[a-m]</td><td>[a, m]</td></tr>
+        <tr><td>Keyword</td><td>[a-m]</td><td>[a m]</td></tr>
+      </tbody></table>
+      <p>Whitespace and keyword representations preserve distinctions lost by standard tokenization.</p>
+      <p class="small">Tokenizer-only examples. Verify the complete production analyzer with _analyze.</p>
     </section>
     <section>
       <h2>Word Shingles</h2>
@@ -408,8 +498,14 @@ flowchart LR
       <p class="small">At least one clause must match. Both prefix clauses can contribute to the same result.</p>
     </section>
     <section>
+      <h2>Generated Queries with NLPAUG</h2>
+      <p>First, use <a href="https://github.com/makcedward/nlpaug">NLPAUG</a> to create variations of company-name queries and compare both search setups.</p>
+      <ul><li>Exercise noisy input beyond exact company names.</li><li>Compare search behavior on the generated queries.</li></ul>
+      <p>Then replay historical customer queries and ask experts to compare both top-20 result lists.</p>
+    </section>
+    <section>
       <h2>What MRR Measures</h2>
-      <p>Average reciprocal rank of the first relevant result.</p>
+      <p>Mean Reciprocal Rank: average <math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="one divided by rank"><mstyle mathvariant="bold" displaystyle="true"><mfrac><mn>1</mn><mi mathvariant="bold">rank</mi></mfrac></mstyle></math> of the first relevant result.</p>
       <table><thead><tr><th>Relevant result</th><th>Score</th></tr></thead><tbody>
         <tr><td>Rank 1</td><td>1</td></tr>
         <tr><td>Rank 2</td><td>0.5</td></tr>
@@ -418,25 +514,31 @@ flowchart LR
       <p>Illustrative MRR@20 = (1 + 0.5 + 0) / 3 = <strong>0.50</strong>.</p>
     </section>
     <section>
-      <h2>Benchmark And Rollout</h2>
+      <h2>Backtesting: Expert Review</h2>
       <div class="diagram-wrap">
         <pre class="mermaid">
 flowchart LR
-  H[Historical queries] --> OLD[PostgreSQL pg_trgm]
+  H[Historical customer queries] --> OLD[PostgreSQL pg_trgm]
   H --> NEW[Elasticsearch]
-  V[Generated typo/OCR/partial variants] --> OLD
-  V --> NEW
-  OLD --> M[Expected-result + mismatch analysis]
-  NEW --> M
-  M --> E[Expert side-by-side review]
-  E --> D{Quality acceptable?}
-  D -->|yes| R[Rollout]
-  D -->|no| T[Tune analyzers + boosts]
-  T --> NEW
+  OLD --> L1[Ordered top 20]
+  NEW --> L2[Ordered top 20]
+  L1 --> E[Experts compare both lists]
+  L2 --> E
+  E --> V[Vote for the expected result list]
         </pre>
       </div>
     </section>
 
+    <section>
+      <h2>MRR Results</h2>
+      <table><thead><tr><th>Search system</th><th>MRR (found only)</th><th>Not found</th></tr></thead><tbody>
+        <tr><td>PostgreSQL pg_trgm</td><td>Awaiting value</td><td>Awaiting value</td></tr>
+        <tr><td>Elasticsearch</td><td>Awaiting value</td><td>Awaiting value</td></tr>
+      </tbody></table>
+      <p class="small">Draft: add query count, cutoff k, relevance labels, country/dataset scope, and not-found counts or rates.</p>
+      <p class="small">MRR averages only queries with a relevant result in the top k; misses are reported separately. Unlike standard MRR, misses do not contribute zero here.</p>
+      <p class="small">Same input query set; each system's found-only subset may differ. Placeholders are not results.</p>
+    </section>
     <section>
       <h2>Human Ranking Review</h2>
       <table><thead><tr><th>Preference</th><th>Share</th></tr></thead><tbody>
@@ -445,61 +547,12 @@ flowchart LR
         <tr><td>PostgreSQL</td><td>20.0%</td></tr>
       </tbody></table>
       <p>Elasticsearch was preferred or tied in <strong>80%</strong> of reviewed cases.</p>
-      <p class="small">Human preference is separate from MRR. No paired measured MRR result is reported here.</p>
-    </section>
-    <section>
-      <h2>Outcome</h2>
-      <table>
-        <thead><tr><th>Dimension</th><th>Before</th><th>After</th></tr></thead>
-        <tbody>
-          <tr><td>Search engine</td><td>PostgreSQL <code>pg_trgm</code></td><td>Elasticsearch</td></tr>
-          <tr><td>Dataset</td><td>25M source rows</td><td>25M replicated docs</td></tr>
-          <tr><td>Source of truth</td><td>PostgreSQL</td><td>PostgreSQL</td></tr>
-          <tr><td>Fuzzy behavior</td><td>native trigram</td><td>multi-field analyzers</td></tr>
-          <tr><td>Freshness</td><td>immediate DB read</td><td>Asynchronous CDC/indexing</td></tr>
-        </tbody>
-      </table>
+      <p class="small">Experts voted on both top-20 lists for the same historical customer query. Customer funnel selections were not used as labels. List-level preference is separate from MRR.</p>
     </section>
 
     <section>
-      <h2>Freshness Trade-off</h2>
-      <ul>
-        <li>Roughly 15-minute freshness was acceptable for company search.</li>
-        <li>Delay includes CDC delivery, buffering, queues, indexing, and refresh.</li>
-        <li>Transactional reads and writes remain in PostgreSQL.</li>
-      </ul>
-      <aside class="notes">Confirm whether 15 minutes was an observed figure or budget, the timing breakdown, and actual monitoring. The source is append-only CDC history, not a claim about BigQuery merge-mode application.</aside>
-    </section>
-    <section>
       <h2>Latency Comparison</h2>
       <div class="latency-chart"><svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><rect width="100%" height="100%" fill="white"/><style>text{font-family:Arial,sans-serif;fill:#111827}.title{font-size:25px;font-weight:700}.sub{font-size:14px;fill:#4b5563}.axis{font-size:14px}.tick{font-size:12px}.label{font-size:16px;font-weight:700}</style><text x="600" y="34" text-anchor="middle" class="title">Latency tail comparison</text><text x="600" y="56" text-anchor="middle" class="sub">Weighted complementary CDF — share of hits by latency threshold</text><line x1="100" x2="1135" y1="620" y2="620" stroke="#e5e7eb"/><text x="88" y="624" text-anchor="end" class="tick">0.1%</text><line x1="100" x2="1135" y1="436.66666666666663" y2="436.66666666666663" stroke="#e5e7eb"/><text x="88" y="440.66666666666663" text-anchor="end" class="tick">1%</text><line x1="100" x2="1135" y1="253.33333333333331" y2="253.33333333333331" stroke="#e5e7eb"/><text x="88" y="257.3333333333333" text-anchor="end" class="tick">10%</text><line x1="100" x2="1135" y1="70" y2="70" stroke="#e5e7eb"/><text x="88" y="74" text-anchor="end" class="tick">100%</text><line x1="100" x2="100" y1="70" y2="620" stroke="#f3f4f6"/><text x="100" y="644" text-anchor="middle" class="tick">0.01s</text><line x1="242.0199246616909" x2="242.0199246616909" y1="70" y2="620" stroke="#f3f4f6"/><text x="242.0199246616909" y="644" text-anchor="middle" class="tick">0.03s</text><line x1="397.6600251127697" x2="397.6600251127697" y1="70" y2="620" stroke="#f3f4f6"/><text x="397.6600251127697" y="644" text-anchor="middle" class="tick">0.1s</text><line x1="539.6799497744605" x2="539.6799497744605" y1="70" y2="620" stroke="#f3f4f6"/><text x="539.6799497744605" y="644" text-anchor="middle" class="tick">0.3s</text><line x1="695.3200502255394" x2="695.3200502255394" y1="70" y2="620" stroke="#f3f4f6"/><text x="695.3200502255394" y="644" text-anchor="middle" class="tick">1s</text><line x1="837.3399748872304" x2="837.3399748872304" y1="70" y2="620" stroke="#f3f4f6"/><text x="837.3399748872304" y="644" text-anchor="middle" class="tick">3s</text><line x1="992.980075338309" x2="992.980075338309" y1="70" y2="620" stroke="#f3f4f6"/><text x="992.980075338309" y="644" text-anchor="middle" class="tick">10s</text><line x1="1135" x2="1135" y1="70" y2="620" stroke="#f3f4f6"/><text x="1135" y="644" text-anchor="middle" class="tick">30s</text><line x1="100" x2="1135" y1="620" y2="620" stroke="#374151"/><line x1="100" x2="100" y1="70" y2="620" stroke="#374151"/><path d="M 351.55190381339617 70 L 368.81378820711274 70.01512981572544 L 384.0398493233818 70.09082204978958 L 409.98097281645187 70.1059691353514 L 421.2291167997661 70.13627195399144 L 450.075353705423 70.1817478172071 L 458.41838427615033 70.21207949567508 L 466.2554568374374 70.28795928319232 L 473.64444539241936 70.3639114543774 L 480.63382897266365 70.50080821083394 L 487.2646211818073 70.72949383003343 L 493.57182847508705 70.8058685649214 L 499.58556888548947 70.89761505675028 L 505.33194186575423 71.09676254204517 L 510.8337128688036 71.29640938504446 L 516.1108580874643 71.48114416632951 L 521.1810022908935 71.80546500178471 L 526.0597739850728 72.1777422668616 L 530.7610959514714 72.52053230913073 L 535.2974247794673 72.81777058444901 L 539.6799497744605 73.22632427945328 L 543.9187592389324 73.84311265448746 L 548.022980345188 74.64092148407755 L 552.0008974781429 75.22033450813478 L 555.860052906475 75.96688505107824 L 559.6073328571282 76.65468601900443 L 563.249041461457 77.39826919158551 L 566.7909645676705 77.9814512328406 L 570.2384250417014 78.60263819723005 L 573.5963308835467 79.19474183437849 L 576.8692172508449 79.77417552831795 L 580.0612832926661 80.34062862693428 L 583.1764245441246 81.13701494259013 L 586.2182615087369 81.78341766697854 L 589.1901649545271 82.25845115769847 L 592.0952783671139 82.75409045062936 L 594.9365379347919 83.23496825403521 L 597.7166903841539 83.73674311762844 L 600.4383089378412 84.25979381403319 L 603.1038076267923 84.87743375142881 L 605.7154541565018 85.4631515561377 L 608.2753814991283 85.9607246800242 L 610.7855983599311 86.5358734714318 L 613.2479986467137 87.24660990112532 L 615.6643700541103 88.05859088963572 L 618.0364018601841 88.91730010595055 L 620.3656920205088 89.53362175146523 L 622.6537536343546 90.36938877256839 L 624.902020848505 91.09562682510379 L 627.1118542563993 91.76887188849936 L 629.2845458434982 92.62856339571385 L 631.4213235238819 93.27441255433644 L 633.52335530797 94.31468696700834 L 635.5917531367779 94.95371701358471 L 637.6275764142255 95.61878508316934 L 639.6318352655879 96.1212573583212 L 641.6054935471805 96.8385654082137 L 643.5494716297239 97.73366785212528 L 645.4646489755125 98.53063493779011 L 647.351866527445 99.29193644214962 L 649.2119289261659 100.25944595013382 L 651.0456065699444 101.4856037470818 L 652.8536375304947 102.38936662889296 L 654.6367293366527 103.4185148005346 L 656.3955606367081 104.48446498541709 L 658.1307827491551 105.7305836483628 L 659.843021110739 106.75611472459579 L 661.532876629848 107.55220728781029 L 663.2009269525844 108.69995627936248 L 664.8477276481849 109.71487655214268 L 666.4738133198824 111.04631464994455 L 668.0796986467636 112.73607685780017 L 669.6658793617037 113.75169342326018 L 671.2328331700284 114.833548296466 L 672.7810206131622 116.0381197588168 L 674.3108858811695 117.34340563135724 L 675.8228575777744 118.33660755394442 L 677.3173494411583 119.37047511956533 L 678.7947610235648 120.67483125971378 L 680.255478332507 122.14639096067025 L 681.6998744361515 123.29034342399532 L 683.128310035252 124.48095484329477 L 684.5411340038294 125.75055938649118 L 685.9386839006232 127.00977439026704 L 687.3212864531916 128.38365507460384 L 688.6892580163958 129.8457920233372 L 690.0429050068789 131.36797415221446 L 691.3825243150314 132.62031159699768 L 692.7084036958298 134.26480086431178 L 694.0208221398337 135.4605851618873 L 695.3200502255394 136.95471068442836 L 696.6063504542025 138.01398114190437 L 697.8799775681658 139.34012669219348 L 699.1411788536591 140.54183329760383 L 700.3901944289686 141.79922230447244 L 701.6272575188192 142.69890029517552 L 702.8525947157514 143.91450642666126 L 704.0664262292269 144.7224542898618 L 705.268966123148 146.3239048213374 L 706.4604225424285 147.11694579000755 L 707.6409979292216 148.07914064200426 L 708.8108892293615 149.25752346518433 L 709.9702880895464 150.32903913499774 L 711.1193810457607 151.7523695038354 L 712.2583497033922 152.81541139654956 L 713.3873709094863 153.71946747618665 L 714.5066169175426 154.15360516582444 L 715.6162555452378 154.85318708565762 L 716.716450325437 155.42615856756146 L 717.8073606508335 156.1370619958151 L 718.8891419125357 156.9895877204633 L 719.9619456329037 157.62365772120242 L 721.0259195929195 157.8969554323811 L 722.081207954357 158.30866901574748 L 723.1279513770075 158.99962494311484 L 724.1662871311962 159.83676571002403 L 725.1963492058155 160.3056755165294 L 726.2182684120884 160.91941618675935 L 727.2321724832632 161.53792453469993 L 728.2381861704278 162.16127521347076 L 729.2364313346256 162.35406139728474 L 730.2270270354412 162.74103982620684 L 731.210089616218 162.83807902775627 L 732.1857327860598 163.1786506347784 L 733.1540676987615 163.4717331314101 L 734.1152030288048 163.86419556504902 L 735.0692450445501 164.1104705990581 L 736.0162976787475 164.70465734932742 L 737.889839260671 164.90370909053922 L 738.8165249952034 165.15322560629346 L 739.7366150458448 165.40352651980334 L 740.650202638982 165.75527501559586 L 741.5573790383079 166.05801551347065 L 742.4582335995322 166.2098185242129 L 743.3528538231996 166.3111815614747 L 744.2413254056903 166.46346848392602 L 745.1237322884831 166.6669718663166 L 746.0001567057457 166.92208472480087 L 746.8706792303237 167.02435918332802 L 747.7353788181927 167.33197317194745 L 748.594332851431 167.6407802365527 L 749.4476171797764 167.95078966784195 L 750.2953061608192 168.05439495899378 L 751.1374726988856 168.31399954181967 L 751.9741882826645 168.4180788442422 L 752.805523021622 168.62664649465336 L 753.6315456812547 169.0454280256003 L 754.4523237172225 169.09793093222783 L 755.2679233084045 169.30828945621647 L 756.0784093889201 169.4136774994198 L 756.8838456791502 169.51920522197906 L 757.6842947158012 169.62487299464254 L 758.4798178810399 169.67775951602613 L 759.2704754307412 169.8896575919013 L 760.056326521875 170.04895205320213 L 760.837429239066 170.15532568961973 L 761.6138406203564 170.3151530869129 L 762.3856166821997 170.58224711469322 L 763.1528124437117 170.7429346667418 L 763.9154819502071 170.85024014796417 L 764.6736782960456 170.90394716856082 L 765.427453646812 171.11913825905293 L 766.1768592608536 171.1730270293101 L 767.6627619008603 171.38894758201855 L 768.3993570926023 171.5512731326686 L 769.1317789180902 171.6596743134914 L 769.8600744015446 171.71393029856574 L 770.5842897768543 171.7682232805642 L 771.3044705051891 171.87692043739918 L 772.0206612921236 171.9313247135272 L 772.7329061042896 172.0947609426874 L 773.4412481855728 172.20390510647564 L 774.145730072867 172.3131990907142 L 774.8463936114025 172.47742188186362 L 776.2364296538892 172.75188149529407 L 776.9258825222292 172.86193079410702 L 777.6116777984689 172.91701253619703 L 778.2938540854334 173.02729046936028 L 778.9724493780242 173.13772135393617 L 779.6475010759165 173.1929942857051 L 780.3190459959283 173.2483056147899 L 780.9871203840689 173.41447052034925 L 781.6517599272788 173.52544009234094 L 782.3129997648673 173.63656454166414 L 782.9708744996616 173.74784430123955 L 783.6254182088713 173.80354255815632 L 784.2766644546812 173.9150560988156 L 784.924646294577 173.97087149192896 L 785.5693962914148 174.19452516431383 L 789.3717911891359 174.41880884787548 L 789.9947904980063 174.47497862446647 L 790.6148017891156 174.53118805498002 L 791.2318535878567 174.58743719544424 L 791.8459740130812 174.6437261020061 L 792.4571907847888 174.8128319815371 L 793.0655312316353 174.86928051634789 L 794.2736905524689 174.92576909978555 L 796.0650186114659 175.03886664013083 L 798.415485298399 175.15212505896613 L 798.9964845073546 175.20881474097337 L 799.574884158584 175.2655448146349 L 800.150707410846 175.32231533755026 L 802.428688935296 175.3791263674422 L 804.1112129865801 175.43597796215724 L 805.2208516142753 175.54980307806272 L 807.4119567198711 175.60677671556752 L 807.9539789243813 175.66379115052482 L 808.4937379815734 175.72084644140455 L 809.0312527118807 175.77794264680261 L 809.5665417019414 175.8350798254409 L 811.1592366705244 176.0067377899168 L 812.2102351945196 176.06403945127136 L 812.7325474460451 176.12138238138093 L 813.7708832002338 176.23619228593975 L 814.8009452748531 176.29365937974853 L 815.3129146822062 176.46630994616794 L 815.8228644811261 176.58161866294085 L 816.3308105428604 176.63933570426175 L 816.8367685523007 176.6970946150396 L 817.3407540108886 176.81273828826056 L 818.3428683810665 176.87062317268263 L 818.841027403663 176.98651934309578 L 819.3372741028492 177.04453075186652 L 820.3240888672527 177.160680524493 L 820.8146856852557 177.21881901193603 L 822.2754029941979 177.2769999827497 L 822.7586637677992 177.33522349906679 L 823.2401246833261 177.39348962315668 L 823.7197990978424 177.4517984174255 L 824.1977002202731 177.5685442668107 L 824.6738411135877 177.68546154922285 L 826.0918309039162 177.74398463529434 L 827.0285893971557 177.80255076887693 L 828.4211210642411 177.91981243221576 L 829.7988119693083 177.9785080891427 L 830.2547987080196 178.03724704792302 L 830.7091826780867 178.15485512693667 L 831.1619751073454 178.2137243754711 L 832.0628296685699 178.39059372998508 L 833.8459214747279 178.50872528728684 L 834.7283283575208 178.56785685704193 L 835.6047527747833 178.62703237445595 L 836.4752752993613 178.68625190490303 L 836.9083480876101 178.86417523037443 L 837.3399748872304 178.9830120509659 L 838.1989289204687 179.04249704067007 L 838.6262751158933 179.22121912472534 L 839.0522132488142 179.28088241340367 L 839.8999022298568 179.40034328354915 L 840.3216713034726 179.46014099947706 L 840.7420687679232 179.57987133033333 L 841.1611035153501 179.63980408063446 L 841.578784351702 179.75980509056257 L 841.9951199978459 179.87998723415936 L 842.4101190906596 179.9401464021257 L 843.2361417502923 180.00035105907028 L 843.64718218051 180.12089711542842 L 844.0569197862601 180.18123865300058 L 844.4653628002611 180.30205909350718 L 844.8725193774421 180.3625381355458 L 846.0863508909177 180.48363421214452 L 846.4884417481879 180.66562435998543 L 846.8892858101011 180.8480314386553 L 847.2888907848387 181.15297495586037 L 847.6872643093201 181.2141040606025 L 848.0844139500774 181.2752801335434 L 848.4803472041193 181.4590908847033 L 848.8750714997789 181.52045555441953 L 849.2685941975502 181.58186755516223 L 849.6609225909125 181.8279903323389 L 850.0520639071406 181.95133761497192 L 851.2184366893941 182.07487628213877 L 851.604900673456 182.1986069286636 L 851.9902127512374 182.26054443082677 L 852.3743797691502 182.38456416776398 L 852.7574085127493 182.5709567343917 L 853.1393057074517 182.88258396200564 L 853.5200780192446 183.07014742922843 L 853.8997320553842 183.258153785805 L 854.278274365083 183.4466051282559 L 854.6557114401884 183.63550356802358 L 855.0320497158496 183.88806731672608 L 855.4072955711772 184.01465026074197 L 855.7814553298912 184.14143477004046 L 856.1545352609604 184.3956110593739 L 856.5265415792334 184.58677718965993 L 856.8974804460587 184.71447674392323 L 857.267357969898 184.90641091886602 L 857.6361802069285 185.22733297774937 L 858.00395316164 185.4205089439587 L 858.3706827874186 185.74351407261128 L 858.7363749871278 185.93794800321677 L 859.1010356136767 186.0678349080665 L 859.4646704705823 186.32824611327243 L 859.8272853125244 186.65496243143625 L 860.188885845892 186.78602526764047 L 860.549477729321 187.0487999451517 L 860.9090665742267 187.37849256950489 L 861.2676579453273 187.57696543093542 L 861.6252573611611 187.77593426837862 L 861.9818702945947 187.84236786006392 L 862.3375021733272 188.30896156465832 L 862.6921583803849 188.57681936149248 L 863.0458442546103 188.8455813213803 L 863.3985650911451 189.04774983037788 L 863.7503261419046 189.31810885081228 L 864.1011326160477 189.657353739901 L 864.4509896804402 189.7934574568302 L 864.7999024601098 189.86159666083108 L 865.1478760386983 189.99805025895176 L 865.4949154589057 190.40881981156582 L 865.8410257229269 190.54621528140768 L 866.1862117928871 190.75275406133767 L 866.5304785912667 190.95983000384877 L 866.8738310013233 191.16744591031525 L 867.2162738675064 191.5146800193832 L 867.5578119958689 191.79356175814758 L 867.898450154471 191.93336979234127 L 868.2381930737794 192.28396769487804 L 868.5770454470618 192.706733228048 L 868.9150119307761 192.98982918856694 L 869.2520971449541 193.13175552742246 L 869.5883056735801 193.3451205189267 L 869.9236420649659 193.63049951625402 L 870.5917164531066 193.916905058947 L 870.924463371418 194.27636686596048 L 871.2563559963164 194.4928255086104 L 871.5873987031916 194.7098742255276 L 871.917595833905 195.1457548123887 L 872.2469516971321 195.29158022863822 L 872.5754705686993 195.51082035343802 L 872.9031566919169 195.73066583600036 L 873.5560475059364 196.0984293305601 L 873.8812605237187 196.39386809259963 L 874.2056574477508 196.61616880940983 L 874.5292423636146 196.9135385482249 L 874.8520193262884 197.06264094201472 L 875.1739923604523 197.2868193773455 L 875.4951654607883 197.81237016347274 L 875.8155425922777 197.8877328335721 L 876.1351276904957 198.2656198979898 L 876.4539246619009 198.72146458787088 L 876.7719373841223 198.95036935985817 L 877.0891697062411 199.179934117685 L 877.4056254490713 199.41016267814493 L 877.7213084054357 199.48705370779584 L 878.0362223404385 199.79536253452284 L 878.3503709917344 200.26007584800914 L 878.6637580697956 200.49345360674033 L 878.9763872581736 200.64941968014932 L 879.2882622137603 200.80569186969853 L 879.5993865670439 200.9622713793858 L 879.909763922362 201.35507264481737 L 880.5282919272042 201.591686949758 L 880.8364496568943 201.6707149016709 L 881.1438745494369 202.06703555577593 L 881.7565397075358 202.2261178365009 L 882.0617868538264 202.3057783284041 L 882.3663149249015 202.54523912548945 L 882.670127300673 202.70528069699344 L 883.2756183673022 203.02633216028337 L 883.5773036999987 203.26797318040082 L 883.8782866215066 203.4294755786054 L 884.1785703950643 203.83467062621014 L 884.478158261223 204.07878115472582 L 884.7770534380561 204.24193829176915 L 885.075259121366 204.65129988768933 L 885.3727784848904 205.22796519700287 L 885.6696146805036 205.6424411721011 L 885.9657708384179 206.31012353354546 L 886.2612500673812 206.73028627646934 L 886.5560554548726 207.06802020817045 L 886.8501900672968 207.40719284040821 L 887.1436569501741 207.57732250987263 L 887.4364591283309 207.91867632325474 L 887.7285996060862 208.26149991000977 L 888.0200813674367 208.69211564333548 L 888.3109073762391 209.03829294960642 L 888.6010805763923 209.56039747629126 L 888.8906038920146 210.08594826241847 L 889.1794802276216 210.4382526204782 L 889.4677124683006 210.79212278082844 L 889.7553034798834 211.23668370693403 L 890.0422561091178 211.7734542006844 L 890.3285731838359 212.6761923860601 L 890.614257513122 213.40582548757868 L 890.8993118874772 213.58928329919564 L 891.1837390789842 214.42011506423822 L 891.4675418414673 214.88546212245498 L 891.7507229106545 215.07236515432643 L 892.0332850043336 215.63572119572396 L 892.31523082251 216.01351860688365 L 892.5965630475614 216.58359733117382 L 892.8772843443904 217.4464424944308 L 893.1573973605765 217.9298723646034 L 893.4369047265255 218.22134549675835 L 893.7158090556177 218.80751247561872 L 893.9941129443554 219.10222220758428 L 894.2718189725064 219.79415031773758 L 894.548929703249 220.29209224721362 L 894.8254476833129 220.49214424948133 L 895.1013754431201 220.59235905819992 L 895.3767154969237 220.9944844332533 L 895.6514703429457 221.80487977552875 L 895.9256424635121 222.1109172631974 L 896.1992343251887 222.418135605833 L 896.4722483789134 222.93281519382543 L 896.744687060128 223.24322749739036 L 897.0165527889087 223.45084340385682 L 897.2878479700954 223.7632858781061 L 897.5585749934189 223.97226409522918 L 897.8287362336273 224.28676347062435 L 898.0983340506109 224.497121994613 L 898.3673707895264 225.02546271907 L 898.6358487809183 225.45067417034443 L 898.9037703408412 225.66413449931383 L 899.1711377709789 226.30797079744949 L 899.4379533587635 227.0657529757957 L 899.7042193774921 227.61147584567726 L 899.9699380864439 227.72107070815036 L 900.2351117309946 228.05076333250358 L 900.4997425427308 228.4924879329724 L 900.763832739562 228.82539708006067 L 901.0273845258326 229.4954205713371 L 901.2904000924322 230.17113032711364 L 901.5528816169048 230.28430824953313 L 901.8148312635573 231.19557032831335 L 902.0762511835659 231.6551424845645 L 902.3371435150827 231.88592715343614 L 902.5975103833406 232.23336329026307 L 902.8573539007568 232.8158139858236 L 903.1166761670357 233.520426150813 L 903.3754792692714 233.87508444329958 L 903.6337652820474 234.94863762895912 L 903.8915362675368 235.30972965382497 L 904.148794275602 235.43045849426574 L 904.4055413438907 235.91521283800733 L 904.6617794979345 236.28072528564883 L 904.9175107512438 236.89366638057245 L 905.1727371054026 237.63547909138433 L 905.4274605501636 238.0089934042878 L 905.6816830635398 238.258979967625 L 905.9354066118979 238.76132015139697 L 906.1886331500489 239.52082341458876 L 906.4413646213384 240.28764142848766 L 906.6936029577364 240.80298727302286 L 906.9453500799262 241.45189595869928 L 907.1966078973913 242.10613673934841 L 907.447378308503 242.63342777256636 L 907.697663200606 242.89838859949955 L 907.9474644501042 243.16423410529222 L 908.1967839225443 244.10174634160404 L 908.4456234727007 244.6424659411049 L 908.6939849446564 245.05042919922766 L 908.9418701718868 245.32357065068797 L 909.1892809773396 245.73504781980424 L 909.4362191735163 246.28701297673527 L 909.6826865625513 247.12220233073785 L 909.9286849362903 247.402557039468 L 910.1742160763697 247.82494877288815 L 910.4192817542931 248.39164621869747 L 910.6638837315085 248.5339530573233 L 910.9080237594834 249.3931770973062 L 911.151703579781 250.2617746753719 L 911.394924924135 250.55342575244975 L 911.637689514522 250.69965289183457 L 911.8799990632355 251.13995256696316 L 912.3632598368367 251.8792397261597 L 912.6042144385452 252.17688738126552 L 912.8447207523639 252.92591129671683 L 913.0847804432442 253.3787314083154 L 913.3243951668801 254.4454355642836 L 913.5635665697748 255.52662499093188 L 913.8022962893107 255.68228614513686 L 914.0405859538145 256.3079919587226 L 914.2784371826253 256.6226985147463 L 914.5158515861606 257.73407166388597 L 914.7528307659805 258.376177200499 L 914.9893763148541 259.0235031646067 L 915.2254898168227 259.8401324260859 L 915.6964269729536 260.1691438653903 L 915.931253752131 260.66522431764326 L 916.1656547345578 261.3315098377438 L 916.399631461581 262.341510548286 L 916.6331854661933 263.02203311000085 L 916.8663182730935 263.88094818173204 L 917.0990313987462 264.22712548800297 L 917.3313263514412 264.9240284493636 L 917.5632046313517 265.62708515887476 L 917.7946677305927 266.33640526231255 L 918.0257171332785 267.0521013622715 L 918.2563543155801 267.7742891254453 L 918.4865807457815 268.32026147059344 L 918.7163978843355 268.5030873948174 L 918.9458071839201 269.05409758710033 L 919.1748100894929 269.60894760263477 L 919.4034080383459 269.79476018408604 L 919.6316024601597 270.1676913343357 L 919.8593947770572 270.54237746116655 L 920.0867864036568 271.10773359996165 L 920.3137787471244 271.29708126355246 L 920.5403732072269 272.2506334392839 L 920.7665711763831 273.4101780351549 L 920.9923740397151 273.99634501401533 L 921.2177831750997 274.7846747710147 L 921.4427999532184 275.98200041682367 L 921.6674257376072 276.99371231392536 L 921.8916618847072 277.8124409163671 L 922.1155097439123 278.2249840932758 L 922.338970657619 279.2657917900857 L 922.5620459612747 280.3203854197524 L 922.7847369834244 281.1742344070758 L 923.0070450457599 281.38913509088513 L 923.2289714631655 282.2545855141923 L 923.4505175437655 282.4724260194805 L 923.6716845889698 283.5706593624982 L 923.8924738935203 284.6842531097336 L 924.1128867455359 285.35996286551017 L 924.3329244265583 286.49904745817406 L 924.552588211596 287.19040336505367 L 924.771879369169 287.4221958286596 L 925.2093488438209 287.8878150212096 L 925.4275296658902 288.12164971208745 L 925.6453428705622 289.06391698169614 L 925.8627896945657 290.9825798226931 L 926.079871368399 291.22569651544836 L 926.296589116372 291.4695578240454 L 926.5129441566477 292.20565540913196 L 926.7289377012826 292.45254135893185 L 926.9445709562679 293.9501526897935 L 927.15984512157 294.4556823564115 L 927.3747613911705 294.70965595298526 L 927.5893209531058 295.220046514914 L 927.8035249895062 295.7337299419479 L 928.017374676636 296.25074899901665 L 928.2308711849308 296.51052298154457 L 928.6568093178518 297.29496927774494 L 928.8692532545543 298.3530666436888 L 929.0813486366517 299.6957739276054 L 929.2930966060098 299.9670541049141 L 929.5044982988944 301.0615133311338 L 929.7155548460044 301.6144367686023 L 929.9262673725101 302.45108882787736 L 930.136636998089 304.15123858485356 L 930.3466648369608 304.72611945787764 L 930.5563519979233 305.88848543023107 L 930.7656995843877 306.47609440735323 L 930.9747086944126 307.06807226455624 L 931.1833804207397 307.9643742814194 L 931.3917158508268 309.48100404185095 L 931.5997160668836 310.71545752932843 L 931.8073821459031 311.9693520265512 L 932.0147151596972 312.603782913294 L 932.2217161749285 313.56500973889547 L 932.4283862531436 314.2123357030032 L 932.6347264508065 315.1933007400885 L 932.8407378193299 315.5229933644417 L 933.2517782495477 316.1865026626756 L 933.4568093891014 317.19225062531467 L 933.6615158552977 318.21086564839743 L 933.8658986747721 318.5533206065026 L 934.0699588692987 319.24268123327556 L 934.2736974558205 320.2880440177617 L 934.4771154464797 321.3473144752377 L 934.6802138486481 321.7035596110047 L 934.8829936649569 322.0614058538838 L 935.0854558933263 322.4208676608972 L 935.2876015269952 323.1446967824792 L 935.4894315545504 323.50909400899 L 935.6909469599553 324.24293012549685 L 935.8921487225792 324.98359272248257 L 936.0930378172255 325.73120999956313 L 936.2936152141598 326.10766769859055 L 936.4938818791388 327.2478397599946 L 936.6938387734373 327.6315545027326 L 936.8934868538764 329.18517755241186 L 937.2918603783577 330.37061863143765 L 937.4905877140193 330.7697204947213 L 937.6890100191151 331.17083295522013 L 937.8871282286049 332.38643908670593 L 938.0849432731569 333.6208925741835 L 938.6765786600345 334.4546243284823 L 938.8731902665879 335.2971788048263 L 939.0695032980731 336.1487447298829 L 939.8517877209841 337.00951695141924 L 940.0466213771412 337.44341805258887 L 940.241161829792 338.7594919008948 L 940.4354099600898 340.09768567016965 L 940.8230327584316 340.54879540390675 L 941.4022963403338 341.4587556513576 L 941.7870350361999 343.310482250484 L 941.9789758381878 345.20630169582415 L 942.1706320725369 345.68739473061805 L 942.362004581787 346.65839036244193 L 942.5530942047413 347.6413738973284 L 942.7439017764893 348.6366450444181 L 943.1246740882822 350.1532748048496 L 943.3146404801305 351.180652349816 L 943.5043281244218 352.7470108327531 L 943.6937378379992 353.8086352942506 L 943.8828704341207 354.88460646600197 L 944.0717267224795 357.6399213662739 L 944.2603075092259 359.3400711232501 L 944.4486135969869 361.66492694574976 L 944.6366457848872 362.2569048029528 L 944.8244048685694 363.45423044876173 L 945.0118916402147 364.05971363294407 L 945.1991068885621 365.2846709483052 L 945.3860513989288 365.904290067725 L 945.945268304403 366.5287689945755 L 946.1311376482711 369.72681554613035 L 946.3167401301034 371.7091749145369 L 946.5020765150963 373.74215314489913 L 946.6871475651596 377.2502383922803 L 946.8719540389355 377.9707922241596 L 947.0564966918167 380.1724252608791 L 947.2407762759661 380.92004253795966 L 947.6085492306773 381.67474634034556 L 947.7920440895771 383.20595997388597 L 947.9752788564563 383.98275301348264 L 948.1582542675985 386.3596654936167 L 948.3409710561654 387.9846332210227 L 948.5234299522139 389.64345686687875 L 948.7056316827142 392.1983494898157 L 948.8875769715667 393.0685292443004 L 949.0692665396198 394.8379499516002 L 949.4318813815621 396.6475881897541 L 949.6128080820398 398.49931478888055 L 949.7934819149294 403.3262868879779 L 950.1540737983584 405.34210734324614 L 950.3339932517434 406.3694848882125 L 950.5136626432643 408.46488621468916 L 950.872254014365 410.6169268144173 L 951.2298534301988 411.715160157435 L 951.4082828669315 413.9581438338871 L 951.5864663636323 417.44573734134934 L 951.9420982423648 419.858669118644 L 952.2967544494223 421.0931226061216 L 952.4737183461742 422.3470171033442 L 953.0031611601827 427.5699157021078 L 953.1791613322152 430.3157276298774 L 953.3549222109422 431.7249795520308 L 953.7057286850854 433.1596247625562 L 953.8807755722108 434.62059520228996 L 954.4044985291473 436.10887507635624 L 954.5786024024537 437.6255048367877 L 954.752472107736 439.1715855518792 L 955.099511527943 442.35683649794 L 955.4456217919646 443.9985576509766 L 955.9630558639443 445.6748438816193 L 956.1350746603044 447.38718202821235 L 956.4784270703607 449.1371569776879 L 956.820869936544 450.92646048069986 L 956.9917517940634 452.7569009802433 L 957.1624080649066 454.6304145968858 L 957.5030462235086 456.5490774378827 L 957.673029293878 458.5151194263744 L 957.842789142817 460.53093988164267 L 958.1816415160993 471.4549830454208 L 958.5196079998138 473.83189552555484 L 958.8566932139917 476.2819551445181 L 959.3606786725795 478.8098073002175 L 960.860952065354 481.42055447122937 L 961.6869747249867 489.80942774068654 L 962.3440135289436 492.8143373751842 L 962.6712848591569 495.93711624662734 L 962.8346103469465 499.1873901893731 L 964.9392747228826 502.5760145666088 L 966.0585207309387 506.1152930190964 L 966.6937657752787 509.81924713528235 L 967.0102215181089 513.703951964771 L 967.1681593586337 517.7879576618157 L 967.3259044744733 522.092825234228 L 968.111755565607 526.6438155838173 L 968.2683541388332 531.4707876829148 L 968.892858282798 536.6093870096261 L 969.3592644642297 542.1026446288239 L 969.5143599913996 548.0031699135808 L 970.2870586840318 554.3762227277697 L 970.5948495589347 561.304125557493 L 970.9019093384348 568.8927845031676 L 971.5138494462999 577.2816577726246 L 972.7291073397777 586.6596202213112 L 973.633111767753 597.2914771672204 L 979.0723085373384 609.5650552661663" fill="none" stroke="#155e75" stroke-width="3" /><text x="989.0723085373384" y="603.5650552661663" class="label" fill="#155e75">postgresql</text><path d="M 100 70 L 189.6045960690376 70.03026250702172 L 242.0199246616909 70.25759868987284 L 279.2091921380752 72.146652592505 L 308.05542904373215 79.9282635013945 L 331.6245207307285 94.2941582431572 L 351.55190381339617 111.86111579990525 L 368.81378820711274 131.36797415221446 L 384.0398493233818 149.7914787885972 L 397.6600251127697 164.06115461419523 L 409.98097281645187 175.32231533755026 L 421.2291167997661 184.07801727961836 L 431.57640622185585 194.63745889082628 L 441.15649988243376 202.78542227901434 L 450.075353705423 209.9103789409686 L 458.41838427615033 215.16598145554724 L 466.2554568374374 219.59584223261814 L 473.64444539241936 225.66413449931383 L 480.63382897266365 231.31021491977748 L 487.2646211818073 236.40293659899902 L 493.57182847508705 243.16423410529222 L 499.58556888548947 248.1077933155063 L 505.33194186575423 252.47565191574205 L 510.8337128688036 255.9945244080951 L 516.1108580874643 260.9976701242791 L 521.1810022908935 265.62708515887476 L 526.0597739850728 271.4868802926801 L 530.7610959514714 277.60696814422954 L 535.2974247794673 284.46028487480714 L 539.6799497744605 289.06391698169614 L 543.9187592389324 297.0326275082294 L 548.022980345188 302.1712268349407 L 552.0008974781429 311.02708475694243 L 555.860052906475 314.86496767681035 L 559.6073328571282 320.2880440177617 L 563.249041461457 324.61240018530657 L 566.7909645676705 330.7697204947213 L 570.2384250417014 337.00951695141924 L 573.5963308835467 341.9176655962217 L 576.8692172508449 343.7802219906607 L 580.0612832926661 349.13898522819005 L 583.1764245441246 355.9753174267555 L 586.2182615087369 360.4940138578263 L 589.1901649545271 367.79261545169055 L 592.0952783671139 376.53614701363426 L 594.9365379347919 380.1724252608791 L 597.7166903841539 386.3596654936167 L 600.4383089378412 389.64345686687875 L 603.1038076267923 391.33757726827946 L 605.7154541565018 400.3951342342207 L 608.2753814991283 403.3262868879779 L 610.7855983599311 407.41029258502243 L 613.2479986467137 409.53363588582187 L 615.6643700541103 416.26615050702424 L 618.0364018601841 421.0931226061216 L 620.3656920205088 423.620974761821 L 622.6537536343546 424.91564808452694 L 624.902020848505 428.9309856832957 L 627.1118542563993 430.3157276298774 L 631.4213235238819 437.6255048367877 L 633.52335530797 440.7482837082308 L 637.6275764142255 443.9985576509766 L 643.5494716297239 447.38718202821235 L 645.4646489755125 450.92646048069986 L 649.2119289261659 452.7569009802433 L 651.0456065699444 454.6304145968858 L 652.8536375304947 458.5151194263744 L 654.6367293366527 460.53093988164267 L 658.1307827491551 462.599125123419 L 659.843021110739 464.7224684242185 L 663.2009269525844 469.1469763722837 L 664.8477276481849 471.4549830454208 L 666.4738133198824 476.2819551445181 L 671.2328331700284 481.42055447122937 L 672.7810206131622 486.91381209042737 L 675.8228575777744 489.80942774068654 L 677.3173494411583 492.8143373751842 L 681.6998744361515 495.93711624662734 L 683.128310035252 499.1873901893731 L 685.9386839006232 502.5760145666088 L 690.0429050068789 506.1152930190964 L 694.0208221398337 509.81924713528235 L 695.3200502255394 513.703951964771 L 704.0664262292269 517.7879576618157 L 708.8108892293615 522.092825234228 L 719.9619456329037 526.6438155838173 L 721.0259195929195 531.4707876829148 L 724.1662871311962 536.6093870096261 L 733.1540676987615 548.0031699135808 L 747.7353788181927 561.304125557493 L 751.9741882826645 568.8927845031676 L 757.6842947158012 577.2816577726246 L 762.3856166821997 586.6596202213112 L 778.2938540854334 597.2914771672204 L 781.6517599272788 609.5650552661663" fill="none" stroke="#b45309" stroke-width="3" stroke-dasharray="6 4"/><text x="791.6517599272788" y="603.5650552661663" class="label" fill="#b45309">elasticsearch</text><text x="600" y="690" text-anchor="middle" class="axis">Latency (log scale)</text><text x="22" y="360" transform="rotate(-90 22 360)" text-anchor="middle" class="axis">Hits at or above latency (log scale)</text><text x="100" y="714" class="sub">Totals: postgresql 5,263 hits · elasticsearch 5,263 hits</text></svg></div>
-    </section>
-    <section>
-      <h2>Reading The Tail</h2>
-      <ul>
-        <li>Horizontal axis: latency; lower is faster.</li>
-        <li>Vertical axis: share of requests at or above that latency.</li>
-        <li>The 1% level indicates approximate p99.</li>
-        <li>Elasticsearch still has requests above 1 second.</li>
-      </ul>
-      <p class="small">5,263 observations per engine. This does not establish a 100 ms maximum or achieved throughput.</p>
-    </section>
-    <section>
-      <h2>Lessons</h2>
-      <ul>
-        <li>Monitor replication lag and failures; support replay.</li>
-        <li>Validate analyzers with real names.</li>
-        <li>Use relevance metrics alongside human judgement.</li>
-        <li>Checkpointing and ordered replay reduce operational risk.</li>
-      </ul>
-    </section>
-    <section>
-      <h2>Closing</h2>
-      <div class="card teal">
-        <p>PostgreSQL remains the source of truth.</p>
-        <p>Elasticsearch serves company search.</p>
-        <p>The migration changed ranking and added asynchronous indexing.</p>
-      </div>
     </section>
     <section>
       <h2>Thank you</h2>

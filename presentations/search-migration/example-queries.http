@@ -94,3 +94,22 @@ GET companies-talk-demo/_search
     }
   }
 }
+
+# Tokenizer-only punctuation comparison; independent of production settings.
+POST _analyze
+{"tokenizer":"standard","text":"a-m"}
+
+POST _analyze
+{"tokenizer":"standard","text":"a m"}
+
+POST _analyze
+{"tokenizer":"whitespace","text":"a-m"}
+
+POST _analyze
+{"tokenizer":"whitespace","text":"a m"}
+
+POST _analyze
+{"tokenizer":"keyword","text":"a-m"}
+
+POST _analyze
+{"tokenizer":"keyword","text":"a m"}
