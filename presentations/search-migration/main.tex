@@ -454,7 +454,7 @@ GET companies/_search
 {
   "match": {
     "name": {
-      "query": "progema fastighetts",
+      "query": "apple orangge",
       "boost": 70,
       "fuzziness": "auto"
     }
@@ -463,9 +463,9 @@ GET companies/_search
 \end{verbatim}
     \column{0.40\textwidth}
       \begin{exampleblock}{Example candidate}
-        Progema Fastighets AB
+        Apple Orange
       \end{exampleblock}
-      \small \texttt{fastighetts} differs from \texttt{fastighets} by one insertion.
+      \small \texttt{orangge} differs from \texttt{orange} by one inserted \texttt{g}.
       \vspace{0.2cm}
 
       This is the fuzzy name clause from our query. A separate prefix clause uses \texttt{fuzziness: "1"}.

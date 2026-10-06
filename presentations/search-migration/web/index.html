@@ -280,13 +280,14 @@ LIMIT 20;</code></pre></div>
       <pre><code>{
   "match": {
     "name": {
-      "query": "progema fastighetts",
+      "query": "apple orangge",
       "boost": 70,
       "fuzziness": "auto"
     }
   }
 }</code></pre>
-      <p>Example candidate: <strong>Progema Fastighets AB</strong>.</p>
+      <p>Example candidate: <strong>Apple Orange</strong>.</p>
+      <p class="small"><code>orangge</code> differs from <code>orange</code> by one inserted <code>g</code>.</p>
       <p class="small">The fuzzy name clause from our query. A separate prefix clause uses fuzziness "1".</p>
     </section>
     <section>
