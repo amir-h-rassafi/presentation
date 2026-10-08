@@ -5,8 +5,9 @@ that still need Amir's confirmation; do not present unverified details as result
 
 ## Confirm before presenting
 
-- Deployment: Elastic Cloud Hosted, confirmed by Amir, chosen for greater control
-  over index settings, shards, and replicas. Do not claim Serverless settings are immutable.
+- Deployment: Elastic Cloud Hosted, three data nodes with 4 CPU cores and 8 GB
+  RAM each, confirmed by Amir; chosen for greater control over index settings,
+  shards, and replicas. Do not claim Serverless settings are immutable.
 - Indexer: Amir confirmed one application partition/shard per worker (1:1).
   The total number was omitted. Ownership enforcement still needs confirmation.
   Elasticsearch primary shards are distinct from these application partitions.
@@ -96,7 +97,8 @@ is absent from the supplied six-clause query.
 ## Supplied default index script: configuration and caveats
 
 - Country alias business_identity_{country} points to business_identity_{country}_1.
-- Managed by Elastic; the script does not reveal node count, CPU, or RAM.
+- The supplied index script does not specify machine size; Amir separately
+  confirmed three 4-core, 8 GB RAM data nodes.
 - Three primaries per default country index; one replica per primary outside DEV,
   zero in DEV. These do not establish indexer-worker count or checkpoint-index settings.
 - Refresh is configured to 300s. Indexing acknowledgement is not search visibility;
@@ -140,8 +142,9 @@ search_as_you_type is a valid alternative: it supports configurable analysis and
 creates shingle/prefix subfields automatically. Punctuation or long names alone
 are not reasons it cannot work. If it was not evaluated, say so plainly.
 
-“Word shingles are adjacent tokens: progema fastighets is a two-word example.
-They supply an ordered phrase signal alongside individual words.”
+“For the input words apple, pear, plum, the two-word shingles are apple pear
+and pear plum; the three-word shingle is apple pear plum. They supply an
+ordered phrase signal alongside individual words.”
 
 Do not claim a measured shingle improvement without a comparison. A shingle match
 can affect ranking; it does not guarantee a particular company will rank first.

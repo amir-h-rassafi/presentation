@@ -348,14 +348,15 @@ flowchart TB
     <section>
       <h2>Elasticsearch Deployment</h2>
       <ul>
-        <li>Deployment: managed by Elastic.</li>
+        <li>Deployment: managed by Elastic Cloud Hosted.</li>
+        <li>Cluster: 3 data nodes, each with 4 CPU cores and 8 GB RAM.</li>
         <li>Default country index: 3 primary shards.</li>
         <li>Replicas per primary: 1 in STAGE/PROD; 0 in DEV.</li>
         <li>Refresh interval: 300 seconds (5 minutes).</li>
         <li>Elasticsearch handles allocation and request routing.</li>
         <li>Writes go through primaries and replicate; reads can use either copy.</li>
       </ul>
-      <p class="small">Index settings from the supplied default script, not node count, CPU, RAM, or indexer-worker count.</p>
+      <p class="small">Machine specs are separately confirmed; index settings are from the supplied default script.</p>
       <p class="small">We chose Elastic Cloud Hosted for greater control over index settings, shards, and replicas.</p>
     </section>
 
@@ -440,11 +441,6 @@ flowchart LR
         <li><a href="https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer">Whitespace</a>: separate boundaries and a <a href="https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter">legal-suffix protection filter</a>.</li>
         <li><a href="https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter">Shingles</a>: whitespace tokens, 2–3 words, plus individual words.</li>
       </ul>
-      <div class="card small">
-        <strong>Why custom prefix rather than search-as-you-type?</strong>
-        <p>Our custom analyzer keeps whole-name prefixes, preserving <code>a-m</code> versus <code>a m</code>, with explicit 3–20-character limits and separate query boosts.</p>
-        <p><a href="https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/search-as-you-type">search_as_you_type</a> builds shingle/prefix subfields automatically and also supports custom analysis; we chose explicit control over these representations.</p>
-      </div>
       <p class="small">Components link to Elastic documentation; analyzer names and their combination are ours.</p>
     </section>
 
@@ -469,9 +465,9 @@ flowchart LR
     </section>
     <section>
       <h2>Word Shingles</h2>
-      <p><code>progema fastighets ab</code></p>
-      <p>Two words: <code>progema fastighets</code>, <code>fastighets ab</code></p>
-      <p>Three words: <code>progema fastighets ab</code></p>
+      <p>Input words, in order: <code>apple</code> → <code>pear</code> → <code>plum</code></p>
+      <p><strong>2-word shingles:</strong> <code>apple pear</code> · <code>pear plum</code></p>
+      <p><strong>3-word shingle:</strong> <code>apple pear plum</code></p>
       <p>Adjacent tokens form an ordered phrase signal alongside individual words. This is unrelated to pgvector.</p>
     </section>
     <section>

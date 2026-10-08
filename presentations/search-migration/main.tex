@@ -512,7 +512,8 @@ GET companies/_search
 
 \begin{frame}{Migration Design: Elasticsearch Deployment}
   \begin{itemize}
-    \item Deployment: managed by Elastic(Cloud Hosted).
+    \item Deployment: managed by Elastic Cloud Hosted.
+    \item Cluster: 3 data nodes, each with 4 CPU cores and 8 GB RAM.
     \item Default country index: \textbf{3 primary shards}.
     \item Replicas per primary: \textbf{1}
     \item Refresh interval: \textbf{300 seconds (5 minutes)}.
@@ -628,11 +629,6 @@ GET companies/_search
     \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer}{\textcolor{PrimaryBlue}{\underline{Whitespace}}}: separate word boundaries and a \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter}{\textcolor{PrimaryBlue}{\underline{legal-suffix protection filter}}}.
     \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter}{\textcolor{PrimaryBlue}{\underline{Shingles}}}: whitespace tokens, 2--3 words, plus individual words.
   \end{itemize}
-  \begin{block}{Why custom prefix rather than search-as-you-type?}
-    Our custom analyzer keeps whole-name prefixes, preserving \texttt{a-m} versus \texttt{a m}, with explicit 3--20-character limits and separate query boosts.
-    \par\smallskip
-    \href{https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/search-as-you-type}{\underline{\texttt{search\_as\_you\_type}}} builds shingle/prefix subfields automatically and also supports custom analysis; we chose explicit control over these representations.
-  \end{block}
   {\scriptsize\textcolor{MutedText}{Underlined components link to Elastic documentation; analyzer names and their combination are ours.}}
 \end{frame}
 
@@ -698,12 +694,16 @@ GET companies/_search
 \end{frame}
 
 \begin{frame}{Index Design: Word Shingles}
-  \begin{exampleblock}{Input: \texttt{progema fastighets ab}}
-    Two-word shingles:\\[0.15cm]
-    \texttt{progema fastighets}, \texttt{fastighets ab}\\[0.2cm]
-    Three-word shingle:\\[0.15cm]
-    \texttt{progema fastighets ab}
+  \begin{exampleblock}{Input words, in order}
+    \centering
+    \texttt{apple} $\to$ \texttt{pear} $\to$ \texttt{plum}
   \end{exampleblock}
+  \begin{block}{Adjacent word shingles}
+    \begin{tabular}{@{}ll@{}}
+      \textbf{2 words} & \texttt{apple pear} \qquad \texttt{pear plum} \\[0.2cm]
+      \textbf{3 words} & \texttt{apple pear plum}
+    \end{tabular}
+  \end{block}
   \begin{itemize}
     \item Shingles join adjacent tokens in their original order.
     \item They add phrase signals alongside individual words.
