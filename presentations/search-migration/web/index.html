@@ -267,15 +267,6 @@ LIMIT 20;</code></pre></div>
       <p class="small">Clause weights are ranking fine-tuning, so they are intentionally omitted here.</p>
     </section>
     <section>
-      <h2>Query Shape</h2>
-      <p>Six <code>should</code> clauses combine exact, prefix, fuzzy prefix, fuzzy text, whitespace, and shingle signals.</p>
-      <ul>
-        <li><code>minimum_should_match: 1</code> requires one matching clause.</li>
-        <li>Scores add across matching clauses.</li>
-        <li>Boosts weight signals; they do not guarantee a fixed ranking order.</li>
-      </ul>
-    </section>
-    <section>
       <h2>Query Fuzziness: One Extra Letter</h2>
       <pre><code>{
   "match": {
@@ -301,11 +292,6 @@ LIMIT 20;</code></pre></div>
       </ul>
     </section>
 
-    <section>
-      <h2>Before And After</h2>
-      <div class="card"><h3>Before</h3><p>Application → PostgreSQL for transactions and pg_trgm search.</p></div>
-      <div class="card teal"><h3>After</h3><p>Application → PostgreSQL for transactions.</p><p>Application → Elasticsearch for search.</p><p>PostgreSQL → CDC/indexing pipeline → Elasticsearch.</p></div>
-    </section>
     <section>
       <h2>Target Architecture</h2>
       <div class="diagram-wrap">
@@ -472,24 +458,24 @@ flowchart LR
     </section>
     <section>
       <h2>Our Search Query</h2>
-      <pre class="production-query"><code>body = {"query": {"bool": {
+      <pre class="production-query"><code>{"query": {"bool": {
     "should": [
         {"term": {"name.normalized_keyword":
-            {"value": query, "boost": 300}}},
+            {"value": "SEARCH_TEXT", "boost": 300}}},
         {"match": {"name.prefix":
-            {"query": query, "boost": 40}}},
+            {"query": "SEARCH_TEXT", "boost": 40}}},
         {"match": {"name.prefix":
-            {"query": query, "boost": 40, "fuzziness": "1"}}},
+            {"query": "SEARCH_TEXT", "boost": 40, "fuzziness": "1"}}},
         {"match": {"name":
-            {"query": query, "boost": 70, "fuzziness": "auto"}}},
+            {"query": "SEARCH_TEXT", "boost": 70, "fuzziness": "auto"}}},
         {"match": {"name.whitespace_tokenizer":
-            {"query": query, "boost": 30}}},
+            {"query": "SEARCH_TEXT", "boost": 30}}},
         {"match": {"name.word_shingle":
-            {"query": query, "boost": 10}}},
+            {"query": "SEARCH_TEXT", "boost": 10}}}
     ],
-    "minimum_should_match": 1,
+    "minimum_should_match": 1
 }}}</code></pre>
-      <p class="small">Python request body; query is the same input string in each clause.</p>
+      <p class="small">Replace <code>SEARCH_TEXT</code> with the same input in all six clauses.</p>
     </section>
     <section>
       <h2>Query Weights</h2>

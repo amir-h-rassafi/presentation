@@ -436,18 +436,6 @@ GET companies/_search
 
 
 
-\begin{frame}{Search Concepts: Query Shape}
-  \begin{block}{Our query combines six \texttt{should} clauses}
-    Exact name, prefix, fuzzy prefix, fuzzy text, whitespace-tokenized text, and word shingles.
-  \end{block}
-  \begin{itemize}
-    \item \texttt{minimum\_should\_match: 1} requires one matching clause.
-    \item Matching clauses contribute to the combined score.
-    \item Boosts weight signals; they do not guarantee a fixed ranking order.
-  \end{itemize}
-  \small The complete query and its boosts follow in Index Design.
-\end{frame}
-
 \begin{frame}[fragile]{Search Concepts: Typo Example}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.56\textwidth}
@@ -486,20 +474,6 @@ GET companies/_search
     \item Benchmark old and new ranking behavior.
     \item Prove the new path before production rollout.
   \end{itemize}
-\end{frame}
-
-\begin{frame}{Migration Design: Before And After}
-  \begin{block}{Before}
-    Application $\rightarrow$ PostgreSQL\\[0.15cm]
-    Transactional reads/writes and \texttt{pg\_trgm} search share the database.
-  \end{block}
-  \vspace{0.15cm}
-  \begin{block}{After}
-    Application $\rightarrow$ PostgreSQL for transactional data\\[0.15cm]
-    Application $\rightarrow$ Elasticsearch for search\\[0.15cm]
-    PostgreSQL $\rightarrow$ CDC pipeline $\rightarrow$ Elasticsearch
-  \end{block}
-  \small The migration changes search queries and adds asynchronous indexing.
 \end{frame}
 
 \begin{frame}{Migration Design: Data Path}
@@ -734,25 +708,25 @@ GET companies/_search
 \begin{frame}[fragile]{Index Design: Our Search Query}
   \scriptsize
 \begin{verbatim}
-body = {"query": {"bool": {
+{"query": {"bool": {
     "should": [
         {"term": {"name.normalized_keyword":
-            {"value": query, "boost": 300}}},
+            {"value": "SEARCH_TEXT", "boost": 300}}},
         {"match": {"name.prefix":
-            {"query": query, "boost": 40}}},
+            {"query": "SEARCH_TEXT", "boost": 40}}},
         {"match": {"name.prefix":
-            {"query": query, "boost": 40, "fuzziness": "1"}}},
+            {"query": "SEARCH_TEXT", "boost": 40, "fuzziness": "1"}}},
         {"match": {"name":
-            {"query": query, "boost": 70, "fuzziness": "auto"}}},
+            {"query": "SEARCH_TEXT", "boost": 70, "fuzziness": "auto"}}},
         {"match": {"name.whitespace_tokenizer":
-            {"query": query, "boost": 30}}},
+            {"query": "SEARCH_TEXT", "boost": 30}}},
         {"match": {"name.word_shingle":
-            {"query": query, "boost": 10}}},
+            {"query": "SEARCH_TEXT", "boost": 10}}}
     ],
-    "minimum_should_match": 1,
+    "minimum_should_match": 1
 }}}
 \end{verbatim}
-  \small Python request body; \texttt{query} is the same input string in every clause.
+  \small Replace \texttt{SEARCH\_TEXT} with the same input in all six clauses.
 \end{frame}
 
 \begin{frame}{Index Design: Query Weights}

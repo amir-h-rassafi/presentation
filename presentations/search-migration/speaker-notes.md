@@ -79,8 +79,8 @@ configuration everywhere. The generic companies/demo index name is illustrative.
 The slides and request example preserve all six clauses and their original order:
 normalized_keyword (term, boost 300), prefix (match, 40), prefix (fuzziness "1",
 40), name (fuzziness "auto", 70), whitespace_tokenizer (match, 30), and word_shingle
-(match, 10), with minimum_should_match = 1. The Python slide uses the query variable;
-the HTTP example substitutes a company name for that variable.
+(match, 10), with minimum_should_match = 1. The slide uses SEARCH_TEXT as a
+placeholder for the shared input; the HTTP example substitutes a company name.
 
 Matching should-clause scores add. Both prefix clauses can contribute. These
 boosts are weights, not guaranteed scores or a strict exact-first ordering. The
