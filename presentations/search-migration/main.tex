@@ -58,8 +58,9 @@
     \item \hyperlink{sec:search-concepts}{\textbf{Search Concepts}}\\[-0.02cm]
       \hyperlink{sec:search-concepts}{{\small\textcolor{MutedText}{Text similarity vs search}}}
     \item \hyperlink{sec:migration-design}{\textbf{Migration Design}}\\[-0.02cm]
-      \hyperlink{sec:migration-design}{{\small\textcolor{MutedText}{Moving data without overloading PostgreSQL}}}
-    \item \hyperlink{sec:index-design}{\textbf{Index Design}}\\[-0.02cm]
+      \hyperlink{sec:migration-design}{{\small\textcolor{MutedText}{Moving data to ElasticSearch}}}
+    \item
+    \hyperlink{sec:index-design}{\textbf{Index Design}}\\[-0.02cm]
       \hyperlink{sec:index-design}{{\small\textcolor{MutedText}{Recreating fuzzy-name signals in Elasticsearch}}}
     \item \hyperlink{sec:validation}{\textbf{Validation}}\\[-0.02cm]
       \hyperlink{sec:validation}{{\small\textcolor{MutedText}{Proving relevance before production rollout}}}
@@ -353,6 +354,7 @@ GET companies/_search
   \end{columns}
   \vspace{0.12cm}
   \begin{block}{Length-sensitive similarity: one- and two-character input}
+  	  \vspace{0.12cm}
     \begin{columns}[T,totalwidth=0.96\textwidth]
       \column{0.43\textwidth}
         \footnotesize
