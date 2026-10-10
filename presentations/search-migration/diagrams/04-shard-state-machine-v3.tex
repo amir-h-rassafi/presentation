@@ -69,10 +69,10 @@
 ]
   \node[note] at (5.05,4.48) {One independent state machine per partition};
 
-  \node[active state] (own) at (0.70,3.76) {Own\\partition $k$};
+  \node[active state] (own) at (0.70,3.76) {partition $k$};
   \node[state box, minimum width=1.70cm] (read) at (2.72,3.76) {Read partition\\checkpoint};
-  \node[state box, minimum width=1.78cm] (fetch) at (4.95,3.76) {Fetch ordered\\rows};
-  \node[state box, minimum width=1.82cm] (write) at (7.18,3.76) {Bulk write\\check each item};
+  \node[state box, minimum width=1.78cm] (fetch) at (4.95,3.76) {Fetch ordered\\rows from BQ};
+  \node[state box, minimum width=1.82cm] (write) at (7.18,3.76) {Bulk write};
   \node[active state, minimum width=1.78cm] (commit) at (9.35,3.76) {Commit partition\\checkpoint};
 
   \draw[arrow] (own.east) -- (read.west);
