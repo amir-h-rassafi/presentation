@@ -260,40 +260,6 @@
   \end{block}
 \end{frame}
 
-\begin{frame}[fragile]{Search Concepts: Trigram Queries}
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{block}{PostgreSQL: similarity}
-        \scriptsize
-\begin{verbatim}
-SELECT name,
-       similarity(name, 'serch')
-FROM companies
-WHERE name % 'serch'
-ORDER BY
-  similarity(name, 'serch') DESC
-LIMIT 20;
-\end{verbatim}
-      \end{block}
-    \column{0.48\textwidth}
-      \begin{block}{Elasticsearch: analyzed terms}
-        \scriptsize
-\begin{verbatim}
-GET companies/_search
-{
-  "size": 20,
-  "query": {
-    "match": {
-      "name.ngram": "serch"
-    }
-  }
-}
-\end{verbatim}
-      \end{block}
-  \end{columns}
-  \vspace{0.15cm}
-  \small The Elasticsearch example analyzes both names and queries into trigrams. BM25 scores their shared terms; it does not reproduce PostgreSQL's similarity formula.
-\end{frame}
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.44\textwidth}

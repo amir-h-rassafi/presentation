@@ -174,25 +174,6 @@
       <p class="small">Default <code>pg_trgm.similarity_threshold</code>: 0.3 for the <code>%</code> filter; higher scores match, lower scores are excluded. Configurable per session.</p>
     </section>
     <section>
-      <h2>Trigram Queries</h2>
-      <div class="two-col">
-        <div><h3>PostgreSQL</h3><pre><code>SELECT name
-FROM companies
-WHERE name % 'serch'
-ORDER BY similarity(name, 'serch') DESC
-LIMIT 20;</code></pre></div>
-        <div><h3>Elasticsearch</h3><pre><code>GET companies/_search
-{
-  "size": 20,
-  "query": {
-    "match": { "name.ngram": "serch" }
-  }
-}</code></pre></div>
-      </div>
-      <p class="small">Illustrative n-gram query, separate from our actual query shown later. BM25 over shared trigrams does not reproduce PostgreSQL's similarity formula.</p>
-    </section>
-
-    <section>
       <h2>BM25 Intuition</h2>
       <ul>
         <li>BM25 ranks documents by search relevance.</li>
