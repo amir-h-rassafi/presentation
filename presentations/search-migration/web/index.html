@@ -239,15 +239,6 @@
     </section>
 
     <section>
-      <h2>Query Shape and Fuzziness</h2>
-      <div class="two-col small">
-        <div class="card"><h3>Boolean structure</h3><p>Six scoring clauses under <code>bool.should</code>.</p><ul><li><code>minimum_should_match: 1</code></li><li>No <code>must</code> or <code>filter</code></li><li>Matching clause scores add</li></ul></div>
-        <div class="card teal"><h3>Two fuzzy clauses</h3><ul><li><code>name</code>: <code>AUTO</code> fuzziness</li><li><code>name.prefix</code>: fuzziness <code>1</code></li><li>No explicit <code>prefix_length</code> or <code>max_expansions</code> override</li></ul></div>
-      </div>
-      <p class="small">Non-fuzzy signals: normalized exact term, standard prefix, whitespace-tokenized text, and word shingles.</p>
-      <p class="small">Clause weights are ranking fine-tuning, so they are intentionally omitted here.</p>
-    </section>
-    <section>
       <h2>Query Fuzziness: One Extra Letter</h2>
       <pre><code>{
   "match": {

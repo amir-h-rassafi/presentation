@@ -360,38 +360,6 @@
   \vspace{0.2cm}
 \end{frame}
 
-\begin{frame}{Search Concepts: Query Shape and Fuzziness}
-  \small
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{block}{Boolean structure}
-        Six scoring clauses under \texttt{bool.should}.
-      \end{block}
-      \begin{itemize}
-        \item \texttt{minimum\_should\_match: 1}.
-        \item No \texttt{must} or \texttt{filter} clause.
-        \item Scores add when multiple clauses match.
-      \end{itemize}
-    \column{0.48\textwidth}
-      \begin{block}{Two fuzzy clauses}
-        Fuzziness is applied only where needed.
-      \end{block}
-      \begin{itemize}
-        \item \texttt{name}: \texttt{AUTO} fuzziness.
-        \item \texttt{name.prefix}: fuzziness \texttt{1}.
-        \item No explicit \texttt{prefix\_length} or \texttt{max\_expansions} override.
-      \end{itemize}
-  \end{columns}
-  \vspace{0.15cm}
-  \begin{block}{Four non-fuzzy signals}
-    Normalized exact term, standard prefix, whitespace-tokenized text, and word shingles.
-  \end{block}
-  {\scriptsize\textcolor{MutedText}{Clause weights are ranking fine-tuning, so they are intentionally omitted here.}}
-\end{frame}
-
-
-
-
 \begin{frame}[fragile]{Search Concepts: Typo Example}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.56\textwidth}
