@@ -456,14 +456,6 @@
   Indexer partitions (application shards) are separate from Elasticsearch index shards.
 \end{frame}
 
-\begin{frame}{Migration Design: Buffered CDC Read}
-  \centering
-  \vspace{-0.05cm}
-  \resizebox{0.84\textwidth}{!}{\input{diagrams/04-timestamp-lag-guardrail.tex}}
-  \par\smallskip
-  {\small\textcolor{MutedText}{The buffer reduces late-arrival risk; it is not a freshness SLA or a completeness guarantee.}}
-\end{frame}
-
 \begin{frame}{Migration Design: Checkpointing}
   \begin{block}{One partition's ordered batch}
     Read checkpoint $\rightarrow$ fetch rows $\rightarrow$ bulk write\\[0.2cm]

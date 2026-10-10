@@ -319,17 +319,6 @@ flowchart TB
     </section>
 
     <section>
-      <h2>Buffered CDC Read</h2>
-      <ul>
-        <li>Read behind the newest CDC window.</li>
-        <li>Leave a buffer for events still in flight.</li>
-        <li>The buffer duration is an operational setting, not a stated SLA.</li>
-      </ul>
-      <div class="card orange">A fixed buffer does not guarantee completeness.</div>
-      <aside class="notes">The buffer reduces late-arrival risk but cannot protect against every delayed event. Do not claim completeness without a separate late-event recovery mechanism.</aside>
-    </section>
-
-    <section>
       <h2>Checkpoint And Replay</h2>
       <div class="diagram-wrap"><pre class="mermaid">
 flowchart LR
