@@ -436,19 +436,7 @@ flowchart LR
     ],
     "minimum_should_match": 1
 }}}</code></pre>
-      <p class="small">Replace <code>SEARCH_TEXT</code> with the same input in all six clauses.</p>
-    </section>
-    <section>
-      <h2>Query Weights</h2>
-      <table><thead><tr><th>Field</th><th>Behavior</th><th>Boost</th></tr></thead><tbody>
-        <tr><td>name.normalized_keyword</td><td>Exact term</td><td>300</td></tr>
-        <tr><td>name.prefix</td><td>Analyzed prefix</td><td>40</td></tr>
-        <tr><td>name.prefix</td><td>Fuzziness 1</td><td>40</td></tr>
-        <tr><td>name</td><td>Fuzziness auto</td><td>70</td></tr>
-        <tr><td>name.whitespace_tokenizer</td><td>Analyzed text</td><td>30</td></tr>
-        <tr><td>name.word_shingle</td><td>Adjacent words</td><td>10</td></tr>
-      </tbody></table>
-      <p class="small">At least one clause must match. Both prefix clauses can contribute to the same result.</p>
+      <p class="small">Replace <code>SEARCH_TEXT</code> with the same input in all six clauses. At least one clause must match.</p>
     </section>
     <section>
       <h2>Generated Queries with NLPAUG</h2>

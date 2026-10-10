@@ -587,24 +587,6 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Index Design: Size And Query Cost}
-  \begin{center}
-    \begin{tabular}{ll}
-      \toprule
-      Indexed form & Additional work \\
-      \midrule
-      Exact keyword & One normalized term per name \\
-      Prefix & 3--20-character prefixes of the whole name \\
-      Whitespace text & Another token stream \\
-      Word shingle & Additional adjacent-word terms \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \begin{block}{Measure the trade-off}
-    Index a representative sample. Compare disk usage, indexing throughput, query latency, and relevance before retaining an extra field.
-  \end{block}
-\end{frame}
-
 \begin{frame}[fragile]{Index Design: Our Search Query}
   \scriptsize
 \begin{verbatim}
@@ -626,28 +608,7 @@
     "minimum_should_match": 1
 }}}
 \end{verbatim}
-  \small Replace \texttt{SEARCH\_TEXT} with the same input in all six clauses.
-\end{frame}
-
-\begin{frame}{Index Design: Query Weights}
-  \small
-  \begin{center}
-    \begin{tabular}{lll}
-      \toprule
-      Field & Match behavior & Boost \\
-      \midrule
-      \texttt{name.normalized\_keyword} & Exact term & 300 \\
-      \texttt{name.prefix} & Analyzed prefix & 40 \\
-      \texttt{name.prefix} & Fuzziness 1 & 40 \\
-      \texttt{name} & Fuzziness auto & 70 \\
-      \texttt{name.whitespace\_tokenizer} & Analyzed text & 30 \\
-      \texttt{name.word\_shingle} & Adjacent-word signal & 10 \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \begin{block}{How the signals combine}
-    At least one clause must match. Scores add across matching clauses; both prefix clauses can contribute to the same result.
-  \end{block}
+  \small Replace \texttt{SEARCH\_TEXT} with the same input in all six clauses. At least one clause must match.
 \end{frame}
 
 \section{Validation}
