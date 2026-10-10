@@ -462,6 +462,16 @@ flowchart LR
       <p>Illustrative MRR@20 = (1 + 0.5 + 0) / 3 = <strong>0.50</strong>.</p>
     </section>
     <section>
+      <h2>MRR Results</h2>
+      <table><thead><tr><th>Search system</th><th>MRR (found only)</th><th>Not found</th></tr></thead><tbody>
+        <tr><td>PostgreSQL pg_trgm</td><td>Awaiting value</td><td>Awaiting value</td></tr>
+        <tr><td>Elasticsearch</td><td>Awaiting value</td><td>Awaiting value</td></tr>
+      </tbody></table>
+      <p class="small">Draft: add query count, cutoff k, relevance labels, country/dataset scope, and not-found counts or rates.</p>
+      <p class="small">MRR averages only queries with a relevant result in the top k; misses are reported separately. Unlike standard MRR, misses do not contribute zero here.</p>
+      <p class="small">Same input query set; each system's found-only subset may differ. Placeholders are not results.</p>
+    </section>
+    <section>
       <h2>Backtesting: Expert Review</h2>
       <div class="diagram-wrap">
         <pre class="mermaid">
@@ -475,17 +485,6 @@ flowchart LR
   E --> V[Vote for the expected result list]
         </pre>
       </div>
-    </section>
-
-    <section>
-      <h2>MRR Results</h2>
-      <table><thead><tr><th>Search system</th><th>MRR (found only)</th><th>Not found</th></tr></thead><tbody>
-        <tr><td>PostgreSQL pg_trgm</td><td>Awaiting value</td><td>Awaiting value</td></tr>
-        <tr><td>Elasticsearch</td><td>Awaiting value</td><td>Awaiting value</td></tr>
-      </tbody></table>
-      <p class="small">Draft: add query count, cutoff k, relevance labels, country/dataset scope, and not-found counts or rates.</p>
-      <p class="small">MRR averages only queries with a relevant result in the top k; misses are reported separately. Unlike standard MRR, misses do not contribute zero here.</p>
-      <p class="small">Same input query set; each system's found-only subset may differ. Placeholders are not results.</p>
     </section>
     <section>
       <h2>Human Ranking Review</h2>

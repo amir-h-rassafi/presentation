@@ -650,18 +650,6 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Validation: Backtesting}
-  \begin{enumerate}
-    \item Take historical customer search queries.
-    \item Run each query against PostgreSQL and Elasticsearch.
-    \item Share both ordered lists of 20 results with domain experts.
-    \item Ask experts to vote for the list they would expect to see.
-  \end{enumerate}
-  \begin{block}{What the votes measure}
-    Expert preference between result lists, not customer funnel selections. List-level votes are not MRR relevance labels.
-  \end{block}
-\end{frame}
-
 \begin{frame}{Validation: MRR Results(Generated Test Cases)}
   \begin{center}
     \begin{tabular}{lll}
@@ -673,6 +661,18 @@
       \bottomrule
     \end{tabular}
   \end{center}
+\end{frame}
+
+\begin{frame}{Validation: Backtesting}
+  \begin{enumerate}
+    \item Take historical customer search queries.
+    \item Run each query against PostgreSQL and Elasticsearch.
+    \item Share both ordered lists of 20 results with domain experts.
+    \item Ask experts to vote for the list they would expect to see.
+  \end{enumerate}
+  \begin{block}{What the votes measure}
+    Expert preference between result lists, not customer funnel selections. List-level votes are not MRR relevance labels.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Validation: Human Judgement}
