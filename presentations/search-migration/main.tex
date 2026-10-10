@@ -249,16 +249,6 @@
   {\scriptsize\textcolor{MutedText}{Default \texttt{pg\_trgm.similarity\_threshold}: 0.3 for the \texttt{\%} filter; higher scores match, lower scores are excluded. Configurable per session.}}
 \end{frame}
 
-\begin{frame}{Search Concepts: Trigram Indexes}
-  \begin{itemize}
-    \item Common fragments can produce many candidate names.
-    \item Lower thresholds admit more potential matches---and more candidates to process.
-    \item Finding the top 20 may require scoring thousands of matches.
-  \end{itemize}
-  \begin{block}{Query plan matters}
-    GIN filtering plus similarity sorting and GiST nearest-neighbor search have different costs. These latency results describe our workload, not a universal PostgreSQL limit.
-  \end{block}
-\end{frame}
 
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
