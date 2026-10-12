@@ -208,7 +208,7 @@
   \vspace{0.25cm}
   \begin{itemize}
     \item Trigram similarity: how the old search matched fuzzy text.
-    \item Trigram indexes: why p99 latency still had a tail cost.
+    \item From character similarity to analyzed-term relevance.
     \item BM25: how Elasticsearch scores analyzed search terms.
     \item Matching tradeoffs and query fuzziness: where behavior changes.
   \end{itemize}
@@ -249,6 +249,33 @@
   {\scriptsize\textcolor{MutedText}{Default \texttt{pg\_trgm.similarity\_threshold}: 0.3 for the \texttt{\%} filter; higher scores match, lower scores are excluded. Configurable per session.}}
 \end{frame}
 
+
+\begin{frame}{Search Concepts: From Similarity to Relevance}
+  \small
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{block}{PostgreSQL: character overlap}
+        How similar are these two names?
+      \end{block}
+      \begin{enumerate}
+        \item Compare their trigram sets.
+        \item Keep names above the similarity cutoff.
+        \item Order by similarity.
+      \end{enumerate}
+      {\small\textcolor{MutedText}{Typos can still share many character fragments.}}
+    \column{0.48\textwidth}
+      \begin{block}{Elasticsearch: analyzed terms}
+        Which matching names are most relevant?
+      \end{block}
+      \begin{enumerate}
+        \item Analyze names and query text into terms.
+        \item Match terms; optionally expand for typos.
+        \item Rank text matches with BM25 and boosts.
+      \end{enumerate}
+      {\small\textcolor{MutedText}{BM25 scores matches; fuzziness handles term spelling differences.}}
+  \end{columns}
+  \vspace{0.2cm}
+\end{frame}
 
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
@@ -291,6 +318,32 @@
   \end{block}
 \end{frame}
 
+\begin{frame}[fragile]{Search Concepts: Typo Example}
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.56\textwidth}
+      \small
+\begin{verbatim}
+{
+  "match": {
+    "name": {
+      "query": "apple orangge",
+      "boost": 70,
+      "fuzziness": "auto"
+    }
+  }
+}
+\end{verbatim}
+    \column{0.40\textwidth}
+      \begin{exampleblock}{Example candidate}
+        Apple Orange
+      \end{exampleblock}
+      \small \texttt{orangge} differs from \texttt{orange} by one inserted \texttt{g}.
+      \vspace{0.2cm}
+
+      This is the fuzzy name clause from our query. A separate prefix clause uses \texttt{fuzziness: "1"}.
+  \end{columns}
+\end{frame}
+
 \begin{frame}{Search Concepts: Matching Tradeoffs}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.48\textwidth}
@@ -331,59 +384,6 @@
         \textcolor{MutedText}{Controlled examples; scores rounded.}
     \end{columns}
   \end{block}
-\end{frame}
-
-\begin{frame}{Search Concepts: From Similarity to Relevance}
-  \small
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{block}{PostgreSQL: character overlap}
-        How similar are these two names?
-      \end{block}
-      \begin{enumerate}
-        \item Compare their trigram sets.
-        \item Keep names above the similarity cutoff.
-        \item Order by similarity.
-      \end{enumerate}
-      {\small\textcolor{MutedText}{Typos can still share many character fragments.}}
-    \column{0.48\textwidth}
-      \begin{block}{Elasticsearch: analyzed terms}
-        Which matching names are most relevant?
-      \end{block}
-      \begin{enumerate}
-        \item Analyze names and query text into terms.
-        \item Match terms; optionally expand for typos.
-        \item Rank text matches with BM25 and boosts.
-      \end{enumerate}
-      {\small\textcolor{MutedText}{BM25 scores matches; fuzziness handles term spelling differences.}}
-  \end{columns}
-  \vspace{0.2cm}
-\end{frame}
-
-\begin{frame}[fragile]{Search Concepts: Typo Example}
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.56\textwidth}
-      \small
-\begin{verbatim}
-{
-  "match": {
-    "name": {
-      "query": "apple orangge",
-      "boost": 70,
-      "fuzziness": "auto"
-    }
-  }
-}
-\end{verbatim}
-    \column{0.40\textwidth}
-      \begin{exampleblock}{Example candidate}
-        Apple Orange
-      \end{exampleblock}
-      \small \texttt{orangge} differs from \texttt{orange} by one inserted \texttt{g}.
-      \vspace{0.2cm}
-
-      This is the fuzzy name clause from our query. A separate prefix clause uses \texttt{fuzziness: "1"}.
-  \end{columns}
 \end{frame}
 
 \section{Migration Design}
@@ -506,29 +506,6 @@
   \small Excerpt from the supplied default mapping; other subfields omitted.
 \end{frame}
 
-\begin{frame}{Index Design: Analyzer Choices}
-  \small
-  \begin{itemize}
-    \item Normalize case and accents with \href{https://www.elastic.co/docs/reference/text-analysis/analysis-lowercase-tokenfilter}{\textcolor{PrimaryBlue}{\underline{lowercase}}} + \href{https://www.elastic.co/docs/reference/text-analysis/analysis-asciifolding-tokenfilter}{\textcolor{PrimaryBlue}{\underline{ASCII folding}}}.
-    \item Main text: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer}{\textcolor{PrimaryBlue}{\underline{standard tokenizer}}} with country-specific analysis and \href{https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter}{\textcolor{PrimaryBlue}{\underline{stemming}}}.
-    \item Prefix: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer}{\textcolor{PrimaryBlue}{\underline{keyword tokenizer}}}, \href{https://www.elastic.co/docs/reference/text-analysis/analysis-edgengram-tokenfilter}{\textcolor{PrimaryBlue}{\underline{edge n-grams}}} 3--20; keyword query analysis.
-    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer}{\textcolor{PrimaryBlue}{\underline{Whitespace}}}: separate word boundaries and a \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter}{\textcolor{PrimaryBlue}{\underline{legal-suffix protection filter}}}.
-    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter}{\textcolor{PrimaryBlue}{\underline{Shingles}}}: whitespace tokens, 2--3 words, plus individual words.
-  \end{itemize}
-  {\scriptsize\textcolor{MutedText}{Underlined components link to Elastic documentation; analyzer names and their combination are ours.}}
-\end{frame}
-
-\begin{frame}{Index Design: Why Separate Prefixes}
-  \begin{itemize}
-    \item Analyzer behavior on names such as \texttt{a-m} and \texttt{a m} drove the design.
-    \item Separate fields retain different token boundaries and matching signals.
-    \item Prefix matching has its own weighting, with and without fuzziness.
-  \end{itemize}
-  \begin{block}{Why not \texttt{search\_as\_you\_type}?}
-    We needed control over these representations. That field type also accepts custom analysis; this example explains our multi-field choice, not a universal limitation of the alternative.
-  \end{block}
-\end{frame}
-
 \begin{frame}{Index Design: Punctuation Changes Tokens}
   \begin{center}
     \begin{tabular}{lll}
@@ -545,6 +522,17 @@
     Standard tokenization merges these two inputs into the same terms. Whitespace and keyword representations retain their different forms.
   \end{block}
   \small Tokenizer-only examples; production char filters and token filters can change the result. Verify the full chain with \texttt{\_analyze}.
+\end{frame}
+
+\begin{frame}{Index Design: Why Separate Prefixes}
+  \begin{itemize}
+    \item Analyzer behavior on names such as \texttt{a-m} and \texttt{a m} drove the design.
+    \item Separate fields retain different token boundaries and matching signals.
+    \item Prefix matching has its own weighting, with and without fuzziness.
+  \end{itemize}
+  \begin{block}{Why not \texttt{search\_as\_you\_type}?}
+    We needed control over these representations. That field type also accepts custom analysis; this example explains our multi-field choice, not a universal limitation of the alternative.
+  \end{block}
 \end{frame}
 
 \begin{frame}{Index Design: Character N-Grams}
@@ -603,6 +591,18 @@
 }}}
 \end{verbatim}
   \small Replace \texttt{SEARCH\_TEXT} with the same input in all six clauses. At least one clause must match.
+\end{frame}
+
+\begin{frame}{Index Design: Analyzer Choices}
+  \small
+  \begin{itemize}
+    \item Normalize case and accents with \href{https://www.elastic.co/docs/reference/text-analysis/analysis-lowercase-tokenfilter}{\textcolor{PrimaryBlue}{\underline{lowercase}}} + \href{https://www.elastic.co/docs/reference/text-analysis/analysis-asciifolding-tokenfilter}{\textcolor{PrimaryBlue}{\underline{ASCII folding}}}.
+    \item Main text: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer}{\textcolor{PrimaryBlue}{\underline{standard tokenizer}}} with country-specific analysis and \href{https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter}{\textcolor{PrimaryBlue}{\underline{stemming}}}.
+    \item Prefix: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer}{\textcolor{PrimaryBlue}{\underline{keyword tokenizer}}}, \href{https://www.elastic.co/docs/reference/text-analysis/analysis-edgengram-tokenfilter}{\textcolor{PrimaryBlue}{\underline{edge n-grams}}} 3--20; keyword query analysis.
+    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer}{\textcolor{PrimaryBlue}{\underline{Whitespace}}}: separate word boundaries and a \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter}{\textcolor{PrimaryBlue}{\underline{legal-suffix protection filter}}}.
+    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter}{\textcolor{PrimaryBlue}{\underline{Shingles}}}: whitespace tokens, 2--3 words, plus individual words.
+  \end{itemize}
+  {\scriptsize\textcolor{MutedText}{Underlined components link to Elastic documentation; analyzer names and their combination are ours.}}
 \end{frame}
 
 \section{Validation}
