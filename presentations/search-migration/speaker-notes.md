@@ -3,6 +3,24 @@
 The slide changes are applied. Items below distinguish the explanation from facts
 that still need Amir's confirmation; do not present unverified details as results.
 
+## Section transitions
+
+After the early Data Path overview, keep the explanation brief: PostgreSQL owns
+company data, BigQuery holds change history, and Elasticsearch serves search.
+The operational details follow Index Design.
+
+From Search Concepts to Index Design:
+“We have seen why the two engines match and rank differently. Now let's look at
+how we represented company names and combined those signals in our query.”
+
+From Index Design to Migration Design:
+“We now have the fields and query that define our search behavior. The next
+challenge is getting our company data into these indexes—and keeping it updated
+as PostgreSQL changes.”
+
+Character N-Grams is a backup slide after Thank you. It describes a mapped field
+that is not used by the supplied search query.
+
 ## Confirm before presenting
 
 - Deployment: Elastic Cloud Hosted, three data nodes with 4 CPU cores and 8 GB
