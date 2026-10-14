@@ -174,24 +174,6 @@
       <p class="small">Default <code>pg_trgm.similarity_threshold</code>: 0.3 for the <code>%</code> filter; higher scores match, lower scores are excluded. Configurable per session.</p>
     </section>
     <section>
-      <h2>From Similarity to Relevance</h2>
-      <div class="two-col small">
-        <div class="card">
-          <h3>PostgreSQL: character overlap</h3>
-          <p>How similar are these two names?</p>
-          <ol><li>Compare their trigram sets.</li><li>Keep names above the similarity cutoff.</li><li>Order by similarity.</li></ol>
-          <p>Typos can still share many character fragments.</p>
-        </div>
-        <div class="card teal">
-          <h3>Elasticsearch: analyzed terms</h3>
-          <p>Which matching names are most relevant?</p>
-          <ol><li>Analyze names and query text into terms.</li><li>Match terms; optionally expand for typos.</li><li>Rank text matches with BM25 and boosts.</li></ol>
-          <p>BM25 scores matches; fuzziness handles term spelling differences.</p>
-        </div>
-      </div>
-      <p class="small">There is no equivalent 0.3 BM25 cutoff. We tune matching and ranking separately, then validate the results.</p>
-    </section>
-    <section>
       <h2>Tokenization Changes The Score</h2>
       <div class="two-col">
         <div class="card">
@@ -253,6 +235,25 @@
         <div><p>Every query is a perfect prefix. Additional candidate trigrams dilute whole-string similarity.</p><p><span style="color: #2a7f78;">Match: ≥ 0.3</span><br><span style="color: #b45309;">No match: &lt; 0.3</span></p><p>Controlled examples; scores rounded.</p></div>
       </div>
     </section>
+    <section>
+      <h2>From Similarity to Relevance</h2>
+      <div class="two-col small">
+        <div class="card">
+          <h3>PostgreSQL: character overlap</h3>
+          <p>How similar are these two names?</p>
+          <ol><li>Compare their trigram sets.</li><li>Keep names above the similarity cutoff.</li><li>Order by similarity.</li></ol>
+          <p>Typos can still share many character fragments.</p>
+        </div>
+        <div class="card teal">
+          <h3>Elasticsearch: analyzed terms</h3>
+          <p>Which matching names are most relevant?</p>
+          <ol><li>Analyze names and query text into terms.</li><li>Match terms; optionally expand for typos.</li><li>Rank text matches with BM25 and boosts.</li></ol>
+          <p>BM25 scores matches; fuzziness handles term spelling differences.</p>
+        </div>
+      </div>
+      <p class="small">There is no equivalent 0.3 BM25 cutoff. We tune matching and ranking separately, then validate the results.</p>
+    </section>
+
     <section>
       <h2>Country-Specific Indexes</h2>
       <ul>
