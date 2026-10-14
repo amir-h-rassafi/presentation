@@ -452,22 +452,6 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{Index Design: Character N-Grams}
-  \begin{exampleblock}{Input}
-    \texttt{progema}
-  \end{exampleblock}
-
-  \vspace{0.05cm}
-  \begin{center}
-    \texttt{pro}, \texttt{rog}, \texttt{oge}, \texttt{gem}, \texttt{ema}
-  \end{center}
-
-  \vspace{0.45cm}
-  \begin{block}{Use case}
-    \texttt{name.character\_ngram} is mapped with keyword tokenization and 3-grams. It is not used by the supplied six-clause query.
-  \end{block}
-\end{frame}
-
 \begin{frame}{Index Design: Word Shingles}
   \begin{exampleblock}{Input words, in order}
     \centering
@@ -528,11 +512,10 @@
 \begin{frame}{Migration Design: Requirements}
   \hypertarget{sec:migration-design}{}
   \begin{itemize}
-    \item Deploy Elasticsearch quickly with low operational overhead.
-    \item Replicate required PostgreSQL data into Elasticsearch.
-    \item Preserve fuzzy, language-agnostic name search behavior.
-    \item Benchmark old and new ranking behavior.
-    \item Prove the new path before production rollout.
+    \item \textbf{Deploy} Elasticsearch \textbf{quickly} with low operational overhead.
+    \item \textbf{Replicate} required PostgreSQL data into Elasticsearch.
+    \item \textbf{Benchmark old} and \textbf{new} ranking behavior.
+    \item \textbf{Prove} the new path before production rollout.
   \end{itemize}
 \end{frame}
 
@@ -548,8 +531,8 @@
 
 \begin{frame}{Migration Design: Elasticsearch Deployment}
   \begin{itemize}
-    \item Deployment: managed by Elastic Cloud Hosted.
-    \item Cluster: 3 data nodes, each with 4 CPU cores and 8 GB RAM.
+    \item Deployment: managed by Elastic \textbf{Cloud Hosted}.
+    \item Cluster: 3 data nodes, each with \textbf{4 CPU} cores and \textbf{8 GB RAM}`````.
     \item Default country index: \textbf{3 primary shards}.
     \item Replicas per primary: \textbf{1}
     \item Refresh interval: \textbf{300 seconds (5 minutes)}.

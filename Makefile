@@ -21,13 +21,7 @@ html:
 		echo "Set PRESENTATION=<name>, for example: make PRESENTATION=search-migration html"; \
 		exit 1; \
 	fi
-	@if [ ! -d "presentations/$(PRESENTATION)/web" ]; then \
-		echo "No HTML deck found at presentations/$(PRESENTATION)/web"; \
-		exit 1; \
-	fi
-	@mkdir -p "dist/$(PRESENTATION)-html"
-	@cp -R "presentations/$(PRESENTATION)/web/." "dist/$(PRESENTATION)-html/"
-	@printf 'HTML deck exported to dist/%s-html/index.html\n' "$(PRESENTATION)"
+	python3 scripts/build-html.py "$(PRESENTATION)"
 
 dist/%.pdf: presentations/%/main.tex common/preamble.tex
 	@mkdir -p build/$* dist

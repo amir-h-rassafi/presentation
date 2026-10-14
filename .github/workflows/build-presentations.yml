@@ -39,10 +39,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install LaTeX
+      - name: Install presentation build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures texlive-xetex
+          sudo apt-get install -y latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures texlive-xetex pandoc poppler-utils
 
       - name: Build PDF
         run: |
@@ -61,19 +61,14 @@ jobs:
           path: dist/${{ matrix.presentation }}.pdf
           if-no-files-found: error
 
-      - name: Export HTML deck if available
-        id: html
-        run: |
-          if [ -d "presentations/${{ matrix.presentation }}/web" ]; then
-            mkdir -p "dist/${{ matrix.presentation }}-html"
-            cp -R "presentations/${{ matrix.presentation }}/web/." "dist/${{ matrix.presentation }}-html/"
-            echo "has_html=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_html=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Generate HTML from LaTeX
+        run: make PRESENTATION="${{ matrix.presentation }}" html
+
+      - name: Check HTML content and order
+        if: matrix.presentation == 'search-migration'
+        run: python3 -m unittest discover -s tests -v
 
       - name: Upload HTML artifact
-        if: steps.html.outputs.has_html == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: presentation-${{ matrix.presentation }}-html

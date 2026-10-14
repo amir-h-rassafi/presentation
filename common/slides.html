@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$pagetitle$</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #e5ebf0; color: #1b2631; font-family: Arial, Helvetica, sans-serif; }
+a { color: #1f4e79; }
+#stage { position: absolute; top: 50%; left: 50%; width: 1280px; height: 720px; transform: translate(-50%, -50%) scale(var(--scale, 1)); transform-origin: center; }
+.frame { width: 1280px; height: 720px; padding: 36px 52px; background: white; overflow: auto; font-size: 28px; line-height: 1.3; }
+.frame[hidden] { display: none; }
+h1, h2 { color: #1f4e79; }
+h2 { font-size: 38px; line-height: 1.2; margin: -36px -52px 28px; padding: 24px 52px; background: #1f4e79; color: white; }
+h3 { color: #1f4e79; font-size: 1em; margin: 0 0 12px; }
+p { margin: .5em 0; }
+li { margin: .3em 0; }
+ul, ol { padding-left: 1.25em; }
+.columns { display: flex; gap: 30px; align-items: flex-start; }
+.column { flex: 1; min-width: 0; }
+.block, .exampleblock, .alertblock { background: #eaf2f8; border-left: 5px solid #1f4e79; padding: 16px 20px; margin: 18px 0; }
+.exampleblock { background: #e8f4f2; border-color: #2a7f78; }
+.alertblock { background: #fff1e6; border-color: #c56b2c; }
+.center { text-align: center; }
+.beamercolorbox { background: #1f4e79; color: white; text-align: center; border-radius: 10px; padding: 26px; margin: 65px 0 42px; }
+.beamercolorbox code { color: inherit; }
+.beamercolorbox strong { font-size: 2em; }
+#slide-1 .columns img { height: 48px; width: auto; }
+#slide-1 .column:last-child { text-align: right; }
+img { width: 100%; height: auto; max-width: 100%; max-height: 470px; object-fit: contain; }
+p:has(> img:only-child) { text-align: center; }
+table { width: 100%; border-collapse: collapse; font-size: .85em; margin: 16px 0; }
+th, td { border-bottom: 1px solid #cad6df; padding: 10px 12px; vertical-align: top; }
+tr:first-child { background: #eaf2f8; }
+code { font-family: ui-monospace, monospace; font-size: .86em; color: #173b5c; }
+pre { font-size: .68em; line-height: 1.24; padding: 18px; background: #f2f5f8; border-radius: 5px; overflow: auto; }
+pre code { font-size: 1em; }
+math { font-size: .94em; }
+nav { position: fixed; bottom: 0; width: 100%; height: 44px; display: flex; justify-content: center; align-items: center; gap: 18px; background: #173b5c; color: white; font-size: 15px; }
+button { cursor: pointer; font: inherit; padding: 4px 12px; border: 1px solid #93b1c8; border-radius: 4px; color: white; background: transparent; }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, a:focus-visible { outline: 3px solid #c56b2c; outline-offset: 3px; }
+@media print { body { background: white; } #stage { position: static; transform: none; width: auto; height: auto; } .frame, .frame[hidden] { display: block; width: 100%; height: auto; min-height: 95vh; break-after: page; } nav { display: none; } }
+</style>
+</head>
+<body>
+<main id="stage" aria-label="Presentation slides">$body$</main>
+<nav aria-label="Slide navigation"><button id="previous" aria-label="Previous slide">← Previous</button><span id="counter" aria-live="polite"></span><button id="next" aria-label="Next slide">Next →</button><button id="fullscreen">Fullscreen</button></nav>
+<script>
+const slides = [...document.querySelectorAll('.frame')];
+const previous = document.getElementById('previous');
+const next = document.getElementById('next');
+let current = 0;
+function resize() {
+  document.documentElement.style.setProperty('--scale', Math.min(innerWidth / 1280, (innerHeight - 52) / 720));
+  document.getElementById('stage').style.top = (innerHeight - 44) / 2 + 'px';
+}
+function show(index) {
+  current = Math.max(0, Math.min(slides.length - 1, index));
+  slides.forEach((slide, i) => { slide.hidden = i !== current; });
+  const slide = slides[current];
+  slide.style.fontSize = '28px';
+  for (let size = 27; size >= 19 && slide.scrollHeight > slide.clientHeight + 2; size--) slide.style.fontSize = size + 'px';
+  document.getElementById('counter').textContent = (current + 1) + ' / ' + slides.length;
+  previous.disabled = current === 0;
+  next.disabled = current === slides.length - 1;
+}
+function fromHash() {
+  const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  const slide = target && target.closest('.frame');
+  show(slide ? slides.indexOf(slide) : 0);
+}
+function go(delta) { location.hash = slides[Math.max(0, Math.min(slides.length - 1, current + delta))].id; }
+previous.onclick = () => go(-1);
+next.onclick = () => go(1);
+document.getElementById('fullscreen').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); };
+addEventListener('keydown', event => {
+  if (event.target.closest('button, a, input, textarea, select') || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key)) { event.preventDefault(); go(1); }
+  if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); go(-1); }
+  if (event.key === 'Home') { event.preventDefault(); go(-slides.length); }
+  if (event.key === 'End') { event.preventDefault(); go(slides.length); }
+});
+addEventListener('hashchange', fromHash);
+addEventListener('resize', resize);
+fromHash(); resize();
+</script>
+</body>
+</html>

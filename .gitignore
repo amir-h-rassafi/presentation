@@ -13,3 +13,5 @@ build/
 dist/
 
 presentations/*/main.pdf
+
+__pycache__/

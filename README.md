@@ -48,13 +48,25 @@ include talking points and facts still needing confirmation. The
 [example mapping](presentations/search-migration/example-index.json), and
 [example queries](presentations/search-migration/example-queries.http) accompany the slides.
 
-Build the HTML version of a presentation when it has a `web/` folder:
+Build real HTML slides directly from the same LaTeX source (requires Pandoc 3+, Python 3, XeLaTeX, and Poppler’s `pdftocairo`):
 
 ```sh
 make PRESENTATION=search-migration html
 ```
 
-The HTML export is written to `dist/search-migration-html/index.html`. GitHub Actions uploads it as a separate artifact when available.
+The result is a self-contained `dist/search-migration-html/index.html` that works
+offline. Open it in a browser and use the arrow keys, navigation buttons, or agenda
+links. Text, tables, code, and equations are HTML/MathML; TikZ and PDF diagrams are
+converted to embedded SVG images. There is no PDF viewer or separately maintained
+HTML deck. Slide order and content come from `main.tex`; the shared browser theme
+and controls live in `common/slides.html`. Browser layout is not pixel-identical
+to the PDF. The converter handles the Beamer structures used in this repository;
+check the HTML when introducing new custom LaTeX commands or environments.
+
+GitHub Actions generates and uploads HTML for every presentation. A nonstandard
+Pandoc installation can be selected with `PANDOC` and `PANDOC_DATA_DIR` environment
+variables. After building the search deck, run `python3 -m unittest discover -s tests -v`
+to verify slide order, code examples, links, and embedded assets.
 
 
 ## GitHub Export
