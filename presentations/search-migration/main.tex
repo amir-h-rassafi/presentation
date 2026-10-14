@@ -57,10 +57,11 @@
       \hyperlink{sec:problem}{{\small\textcolor{MutedText}{Why and how this became an initiative}}}
     \item \hyperlink{sec:search-concepts}{\textbf{Search Concepts}}\\[-0.02cm]
       \hyperlink{sec:search-concepts}{{\small\textcolor{MutedText}{Text similarity vs search}}}
-    \item \hyperlink{sec:index-design}{\textbf{Index Design}}\\[-0.02cm]
+    \item
+    \hyperlink{sec:index-design}{\textbf{Index Design}}\\[-0.02cm]
       \hyperlink{sec:index-design}{{\small\textcolor{MutedText}{Recreating fuzzy-name signals in Elasticsearch}}}
     \item \hyperlink{sec:migration-design}{\textbf{Migration Design}}\\[-0.02cm]
-      \hyperlink{sec:migration-design}{{\small\textcolor{MutedText}{Populating indexes and keeping them updated}}}
+      \hyperlink{sec:migration-design}{{\small\textcolor{MutedText}{Moving data to ElasticSearch}}}
     \item \hyperlink{sec:validation}{\textbf{Validation}}\\[-0.02cm]
       \hyperlink{sec:validation}{{\small\textcolor{MutedText}{Proving relevance before production rollout}}}
     \item \hyperlink{sec:outcome}{\textbf{Outcome}}\\[-0.02cm]
@@ -197,22 +198,12 @@
   \scriptsize Capability summary checked September 2025; sources in presenter notes. The latency target was an acceptance criterion, not a three-engine benchmark result.
 \end{frame}
 
-\begin{frame}{Problem \& Goal: Data Path}
-  \centering
-  \vfill
-  \includegraphics[width=0.98\textwidth]{diagrams/02-target-architecture-cropped.pdf}
-  \vspace{0.3cm}
-
-  \small PostgreSQL owns the data; BigQuery holds change history; Elasticsearch serves search.
-  \vfill
-\end{frame}
-
 \section{Search Concepts}
 \subsection{Text similarity vs search}
 
 \begin{frame}{Search Concepts: Why This Matters}
   \hypertarget{sec:search-concepts}{}
-  Because PostgreSQL \texttt{pg\_trgm} and Elasticsearch BM25 match and rank text differently, we need a few concepts before designing the new search index.
+  Because PostgreSQL \texttt{pg\_trgm} and Elasticsearch BM25 match and rank text differently, we need a few concepts before discussing the migration.
 
   \vspace{0.25cm}
   \begin{itemize}
@@ -407,24 +398,6 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Index Design: Punctuation Changes Tokens}
-  \begin{center}
-    \begin{tabular}{lll}
-      \toprule
-      Tokenizer & Input: \texttt{a-m} & Input: \texttt{a m} \\
-      \midrule
-      Standard & \texttt{[a, m]} & \texttt{[a, m]} \\
-      Whitespace & \texttt{[a-m]} & \texttt{[a, m]} \\
-      Keyword & \texttt{[a-m]} & \texttt{[a m]} \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \begin{block}{Preserve the useful distinction}
-    Standard tokenization merges these two inputs into the same terms. Whitespace and keyword representations retain their different forms.
-  \end{block}
-  \small Tokenizer-only examples; production char filters and token filters can change the result. Verify the full chain with \texttt{\_analyze}.
-\end{frame}
-
 \begin{frame}[fragile]{Index Design: Elasticsearch Multi-fields}
   \scriptsize
 \begin{verbatim}
@@ -450,6 +423,24 @@
   \small Excerpt from the supplied default mapping; other subfields omitted.
 \end{frame}
 
+\begin{frame}{Index Design: Punctuation Changes Tokens}
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      Tokenizer & Input: \texttt{a-m} & Input: \texttt{a m} \\
+      \midrule
+      Standard & \texttt{[a, m]} & \texttt{[a, m]} \\
+      Whitespace & \texttt{[a-m]} & \texttt{[a, m]} \\
+      Keyword & \texttt{[a-m]} & \texttt{[a m]} \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \begin{block}{Preserve the useful distinction}
+    Standard tokenization merges these two inputs into the same terms. Whitespace and keyword representations retain their different forms.
+  \end{block}
+  \small Tokenizer-only examples; production char filters and token filters can change the result. Verify the full chain with \texttt{\_analyze}.
+\end{frame}
+
 \begin{frame}{Index Design: Why Separate Prefixes}
   \begin{itemize}
     \item Analyzer behavior on names such as \texttt{a-m} and \texttt{a m} drove the design.
@@ -458,6 +449,22 @@
   \end{itemize}
   \begin{block}{Why not \texttt{search\_as\_you\_type}?}
     We needed control over these representations. That field type also accepts custom analysis; this example explains our multi-field choice, not a universal limitation of the alternative.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Index Design: Character N-Grams}
+  \begin{exampleblock}{Input}
+    \texttt{progema}
+  \end{exampleblock}
+
+  \vspace{0.05cm}
+  \begin{center}
+    \texttt{pro}, \texttt{rog}, \texttt{oge}, \texttt{gem}, \texttt{ema}
+  \end{center}
+
+  \vspace{0.45cm}
+  \begin{block}{Use case}
+    \texttt{name.character\_ngram} is mapped with keyword tokenization and 3-grams. It is not used by the supplied six-clause query.
   \end{block}
 \end{frame}
 
@@ -477,18 +484,6 @@
     \item They add phrase signals alongside individual words.
     \item They are a text-analysis technique, unrelated to \texttt{pgvector}.
   \end{itemize}
-\end{frame}
-
-\begin{frame}{Index Design: Analyzer Choices}
-  \small
-  \begin{itemize}
-    \item Normalize case and accents with \href{https://www.elastic.co/docs/reference/text-analysis/analysis-lowercase-tokenfilter}{\textcolor{PrimaryBlue}{\underline{lowercase}}} + \href{https://www.elastic.co/docs/reference/text-analysis/analysis-asciifolding-tokenfilter}{\textcolor{PrimaryBlue}{\underline{ASCII folding}}}.
-    \item Main text: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer}{\textcolor{PrimaryBlue}{\underline{standard tokenizer}}} with country-specific analysis and \href{https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter}{\textcolor{PrimaryBlue}{\underline{stemming}}}.
-    \item Prefix: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer}{\textcolor{PrimaryBlue}{\underline{keyword tokenizer}}}, \href{https://www.elastic.co/docs/reference/text-analysis/analysis-edgengram-tokenfilter}{\textcolor{PrimaryBlue}{\underline{edge n-grams}}} 3--20; keyword query analysis.
-    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer}{\textcolor{PrimaryBlue}{\underline{Whitespace}}}: separate word boundaries and a \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter}{\textcolor{PrimaryBlue}{\underline{legal-suffix protection filter}}}.
-    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter}{\textcolor{PrimaryBlue}{\underline{Shingles}}}: whitespace tokens, 2--3 words, plus individual words.
-  \end{itemize}
-  {\scriptsize\textcolor{MutedText}{Underlined components link to Elastic documentation; analyzer names and their combination are ours.}}
 \end{frame}
 
 \begin{frame}[fragile]{Index Design: Our Search Query}
@@ -515,6 +510,18 @@
   \small Replace \texttt{SEARCH\_TEXT} with the same input in all six clauses. At least one clause must match.
 \end{frame}
 
+\begin{frame}{Index Design: Analyzer Choices}
+  \small
+  \begin{itemize}
+    \item Normalize case and accents with \href{https://www.elastic.co/docs/reference/text-analysis/analysis-lowercase-tokenfilter}{\textcolor{PrimaryBlue}{\underline{lowercase}}} + \href{https://www.elastic.co/docs/reference/text-analysis/analysis-asciifolding-tokenfilter}{\textcolor{PrimaryBlue}{\underline{ASCII folding}}}.
+    \item Main text: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-standard-tokenizer}{\textcolor{PrimaryBlue}{\underline{standard tokenizer}}} with country-specific analysis and \href{https://www.elastic.co/docs/reference/text-analysis/analysis-stemmer-tokenfilter}{\textcolor{PrimaryBlue}{\underline{stemming}}}.
+    \item Prefix: \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-tokenizer}{\textcolor{PrimaryBlue}{\underline{keyword tokenizer}}}, \href{https://www.elastic.co/docs/reference/text-analysis/analysis-edgengram-tokenfilter}{\textcolor{PrimaryBlue}{\underline{edge n-grams}}} 3--20; keyword query analysis.
+    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-whitespace-tokenizer}{\textcolor{PrimaryBlue}{\underline{Whitespace}}}: separate word boundaries and a \href{https://www.elastic.co/docs/reference/text-analysis/analysis-keyword-marker-tokenfilter}{\textcolor{PrimaryBlue}{\underline{legal-suffix protection filter}}}.
+    \item \href{https://www.elastic.co/docs/reference/text-analysis/analysis-shingle-tokenfilter}{\textcolor{PrimaryBlue}{\underline{Shingles}}}: whitespace tokens, 2--3 words, plus individual words.
+  \end{itemize}
+  {\scriptsize\textcolor{MutedText}{Underlined components link to Elastic documentation; analyzer names and their combination are ours.}}
+\end{frame}
+
 \section{Migration Design}
 \subsection{Moving data without overloading PostgreSQL}
 
@@ -527,6 +534,16 @@
     \item Benchmark old and new ranking behavior.
     \item Prove the new path before production rollout.
   \end{itemize}
+\end{frame}
+
+\begin{frame}{Migration Design: Data Path}
+  \centering
+  \vfill
+  \includegraphics[width=0.98\textwidth]{diagrams/02-target-architecture-cropped.pdf}
+  \vspace{0.3cm}
+
+  \small PostgreSQL owns the data; BigQuery holds change history; Elasticsearch serves search.
+  \vfill
 \end{frame}
 
 \begin{frame}{Migration Design: Elasticsearch Deployment}
@@ -688,25 +705,6 @@
     Head of Platform at Condukt\\[0.4cm]
     \href{https://amir-h-rassafi.github.io}{amir-h-rassafi.github.io}
   \end{center}
-\end{frame}
-
-\appendix
-\section*{Appendix}
-
-\begin{frame}[noframenumbering]{Appendix: Character N-Grams}
-  \begin{exampleblock}{Input}
-    \texttt{progema}
-  \end{exampleblock}
-
-  \vspace{0.05cm}
-  \begin{center}
-    \texttt{pro}, \texttt{rog}, \texttt{oge}, \texttt{gem}, \texttt{ema}
-  \end{center}
-
-  \vspace{0.45cm}
-  \begin{block}{Use case}
-    \texttt{name.character\_ngram} is mapped with keyword tokenization and 3-grams. It is not used by the supplied six-clause query.
-  \end{block}
 \end{frame}
 
 \end{document}
