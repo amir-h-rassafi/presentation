@@ -250,33 +250,6 @@
 \end{frame}
 
 
-\begin{frame}{Search Concepts: From Similarity to Relevance}
-  \small
-  \begin{columns}[T,totalwidth=\textwidth]
-    \column{0.48\textwidth}
-      \begin{block}{PostgreSQL: character overlap}
-        How similar are these two names?
-      \end{block}
-      \begin{enumerate}
-        \item Compare their trigram sets.
-        \item Keep names above the similarity cutoff.
-        \item Order by similarity.
-      \end{enumerate}
-      {\small\textcolor{MutedText}{Typos can still share many character fragments.}}
-    \column{0.48\textwidth}
-      \begin{block}{Elasticsearch: analyzed terms}
-        Which matching names are most relevant?
-      \end{block}
-      \begin{enumerate}
-        \item Analyze names and query text into terms.
-        \item Match terms; optionally expand for typos.
-        \item Rank text matches with BM25 and boosts.
-      \end{enumerate}
-      {\small\textcolor{MutedText}{BM25 scores matches; fuzziness handles term spelling differences.}}
-  \end{columns}
-  \vspace{0.2cm}
-\end{frame}
-
 \begin{frame}{Search Concepts: BM25 Formula}
   \begin{columns}[T,totalwidth=\textwidth]
     \column{0.44\textwidth}
@@ -384,6 +357,33 @@
         \textcolor{MutedText}{Controlled examples; scores rounded.}
     \end{columns}
   \end{block}
+\end{frame}
+
+\begin{frame}{Search Concepts: From Similarity to Relevance}
+  \small
+  \begin{columns}[T,totalwidth=\textwidth]
+    \column{0.48\textwidth}
+      \begin{block}{PostgreSQL: character overlap}
+        How similar are these two names?
+      \end{block}
+      \begin{enumerate}
+        \item Compare their trigram sets.
+        \item Keep names above the similarity cutoff.
+        \item Order by similarity.
+      \end{enumerate}
+      {\small\textcolor{MutedText}{Typos can still share many character fragments.}}
+    \column{0.48\textwidth}
+      \begin{block}{Elasticsearch: analyzed terms}
+        Which matching names are most relevant?
+      \end{block}
+      \begin{enumerate}
+        \item Analyze names and query text into terms.
+        \item Match terms; optionally expand for typos.
+        \item Rank text matches with BM25 and boosts.
+      \end{enumerate}
+      {\small\textcolor{MutedText}{BM25 scores matches; fuzziness handles term spelling differences.}}
+  \end{columns}
+  \vspace{0.2cm}
 \end{frame}
 
 \section{Index Design}
