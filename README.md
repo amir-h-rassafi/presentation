@@ -18,7 +18,16 @@ Each presentation lives in `presentations/<name>/main.tex`. Shared packages and
 theme settings belong in `common/preamble.tex`.
 
 ## Local Builds
-Prerequisite: install a XeLaTeX distribution with Beamer/PGF support. On Ubuntu/Debian, the CI uses `latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-pictures texlive-xetex`.
+On Ubuntu/Debian, install all PDF and HTML build dependencies:
+
+```sh
+make install-deps
+```
+
+This installs Python 3, Pandoc, Poppler, XeLaTeX, latexmk, and the required TeX
+packages/fonts using apt. It may prompt for your sudo password. When already
+running as root, use `make install-deps SUDO=`. GitHub Actions uses the same target.
+Older distribution repositories may need a separate Pandoc 3+ installation.
 
 Build every presentation:
 
@@ -52,6 +61,12 @@ Build real HTML slides directly from the same LaTeX source (requires Pandoc 3+, 
 
 ```sh
 make PRESENTATION=search-migration html
+```
+
+Or build HTML for every presentation:
+
+```sh
+make html-all
 ```
 
 The result is a self-contained `dist/search-migration-html/index.html` that works
